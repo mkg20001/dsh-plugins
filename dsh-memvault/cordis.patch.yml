@@ -1,0 +1,22 @@
+# Memvault agent connection.
+#
+# The provisioning token is read from MEMVAULT_TOKEN (falling back to
+# MEMVAULT_JOIN_TOKEN) at activation; do not paste a token here unless you
+# cannot set the environment variable. The agent id names the identity
+# directory, the memvault bucket label, and the tool namespace
+# (`mcp__<serverName>__<memvault tool>`).
+- insert:
+    - id: memvault
+      name: '@local/dsh-memvault'
+      config:
+        server: 'http://127.0.0.1:8401'
+        agentId: 'dsh'
+        serverName: 'memvault'
+        defaultVisibility: 'internal'
+        # Optional:
+        # token: 'mvjoin1:...'          # or MEMVAULT_TOKEN
+        # identityDir: '/home/me/.local/share/memvault/agents/dsh'
+        # command: '/home/me/.nix-profile/bin/memvault-mcp'
+        # defaultTags: ['agent:dsh']
+        # ttlSecs: 2592000              # credential lifetime; default never expires
+        # failOnStartupError: true      # mark the plugin failed when memvault is unreachable
