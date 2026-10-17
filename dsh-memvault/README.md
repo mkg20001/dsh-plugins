@@ -75,7 +75,8 @@ memctl token issue --agent-role agent-host --label dsh
 # → mvjoin1:…
 ```
 
-Redeem it from the panel (per identity, or "New identity…" with an agent id),
+Redeem it from the panel (per identity, or "New identity…" with an agent id and,
+optionally, that identity's own server URL — the node that issued the token),
 or set `MEMVAULT_TOKEN` in the environment that launches dsh (env is read at
 activation, so a running host needs a restart), or put `token:` in the row
 config for one-shot activation-time provisioning. An enrolled agent is never

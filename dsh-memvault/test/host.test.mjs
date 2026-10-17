@@ -316,12 +316,32 @@ await writeFile(join(dir, 'private_key.pem'), 'stub\\n')
   const host = makeHost({ stateFile, dataDir })
   plugin.apply(host.ctx, { dataDir, command: stub })
   await waitFor(() => host.ctx.services.memvault !== undefined, 'service for redeem')
-  const result = await host.ctx.services.memvault.redeem({ agentId: 'work', label: 'Work', token: 'mvjoin1:secret' })
+  const result = await host.ctx.services.memvault.redeem({
+    agentId: 'work',
+    label: 'Work',
+    server: 'https://vault.example:9443',
+    token: 'mvjoin1:secret',
+  })
   eq(result.identities.length, 2, 'new identity added')
   const added = result.identities.find((item) => item.agentId === 'work')
   eq(added?.status, 'connected', 'new identity reports its tools')
   ok(host.ctx.children.some((child) => child.config.serverName === 'memvault_work'), 'new identity spawned its own namespace')
   ok(result.identities.some((item) => item.serverName === 'memvault_work'), 'namespace derived from the agent id')
+  eq(added?.server, 'https://vault.example:9443', 'identity keeps its own server')
+  ok(
+    host.ctx.children.some(
+      (child) =>
+        child.config.serverName === 'memvault_work' &&
+        child.config.args.includes('https://vault.example:9443'),
+    ),
+    'connection targets the identity server',
+  )
+  let badServer
+  try {
+    await host.ctx.services.memvault.redeem({ agentId: 'bad', token: 'mvjoin1:x', server: 'ftp://nope' })
+  } catch (failure) { badServer = String(failure.message) }
+  ok(badServer?.includes('http(s) URL'), 'invalid server rejected')
+  eq(host.ctx.services.memvault.snapshot().identities.length, 2, 'rejected server adds no identity')
   ok(!JSON.stringify(host.ctx.log).includes('mvjoin1:secret'), 'token never logged')
   const saved = JSON.parse(await readFile(stateFile, 'utf8'))
   eq(saved.identities.length, 2, 'new identity persisted')

@@ -247,6 +247,7 @@ window.__ModuleLoader__.load({
       const [mode, setMode] = React.useState('write')
       const [buckets, setBuckets] = React.useState(null)
       const [newAgent, setNewAgent] = React.useState('')
+      const [newServer, setNewServer] = React.useState('')
       const [newToken, setNewToken] = React.useState('')
       const [addOpen, setAddOpen] = React.useState(false)
       const acl = state?.acl ?? null
@@ -276,6 +277,7 @@ window.__ModuleLoader__.load({
 
       const ids = state?.identities ?? []
       const selected = ids.find((item) => item.id === identity) ?? null
+      const defaultServer = ids[0]?.server ?? 'http://127.0.0.1:8401'
 
       const change = async (task) => {
         setBusy(true)
@@ -447,6 +449,13 @@ window.__ModuleLoader__.load({
                   placeholder: 'e.g. work',
                   onChange: (event) => setNewAgent(event.target.value.trim()),
                 }),
+                h('div', { className: 'dsmv-label' }, 'Memvault server URL (the node that issues the token)'),
+                h('input', {
+                  type: 'text',
+                  value: newServer,
+                  placeholder: defaultServer,
+                  onChange: (event) => setNewServer(event.target.value.trim()),
+                }),
                 h('div', { className: 'dsmv-label' }, 'Provisioning token (mvjoin1:…)'),
                 h('input', {
                   type: 'password',
@@ -466,8 +475,14 @@ window.__ModuleLoader__.load({
                       disabled: busy || newAgent === '' || newToken.trim() === '',
                       onClick: () =>
                         change(async () => {
-                          await api('redeem', { agentId: newAgent, label: newAgent, token: newToken.trim() })
+                          await api('redeem', {
+                            agentId: newAgent,
+                            label: newAgent,
+                            server: newServer.trim() === '' ? undefined : newServer.trim(),
+                            token: newToken.trim(),
+                          })
                           setNewAgent('')
+                          setNewServer('')
                           setNewToken('')
                           setAddOpen(false)
                         }),
@@ -479,7 +494,13 @@ window.__ModuleLoader__.load({
               )
             : h(
                 'button',
-                { type: 'button', onClick: () => setAddOpen(true) },
+                {
+                  type: 'button',
+                  onClick: () => {
+                    setNewServer(defaultServer)
+                    setAddOpen(true)
+                  },
+                },
                 'New identity…',
               ),
         ),

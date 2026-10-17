@@ -740,8 +740,12 @@ export function apply(ctx, config) {
           throw new Error(`memvault: an identity for agent "${nextAgentId}" already exists`)
         }
         const index = identities.length
+        const chosenServer = firstString(server, settings.server).replace(/\/+$/, '')
+        if (!/^https?:\/\/[^\s]+$/i.test(chosenServer)) {
+          throw new Error(`memvault: server must be an http(s) URL, got "${chosenServer}"`)
+        }
         const base = {
-          server: (firstString(server, settings.server)).replace(/\/+$/, ''),
+          server: chosenServer,
           agentId: nextAgentId,
           serverName:
             index === 0 ? settings.serverName : `${settings.serverName}_${slug(nextAgentId)}`,
