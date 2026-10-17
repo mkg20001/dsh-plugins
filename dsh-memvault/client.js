@@ -377,7 +377,6 @@ window.__ModuleLoader__.load({
         h('style', { 'data-plugin': '@local/memvault' }, PANEL_CSS),
         h('h3', null, 'Memvault session'),
         error === null ? null : h('div', { className: 'dsmv-error' }, error),
-        notice === null ? null : h('div', { className: 'dsmv-note' }, notice),
 
         h(
           'div',

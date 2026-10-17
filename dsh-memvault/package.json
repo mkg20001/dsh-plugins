@@ -31,6 +31,8 @@
     }
   },
   "scripts": {
-    "test": "node test/host.test.mjs"
+    "test": "node test/host.test.mjs && node test/render.test.mjs",
+    "test:host": "node test/host.test.mjs",
+    "test:render": "node test/render.test.mjs"
   }
 }
