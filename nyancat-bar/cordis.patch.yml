@@ -1,0 +1,3 @@
+- insert:
+    - id: nyancat-bar
+      name: '@local/nyancat-bar'

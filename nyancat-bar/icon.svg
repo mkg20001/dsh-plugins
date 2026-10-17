@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <clipPath id="nyan-rainbow-clip">
+      <rect x="2" y="42" width="60" height="20" rx="4"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#nyan-rainbow-clip)">
+    <rect x="2" y="42" width="60" height="3.34" fill="#ff3b30"/>
+    <rect x="2" y="45.33" width="60" height="3.34" fill="#ff9500"/>
+    <rect x="2" y="48.66" width="60" height="3.34" fill="#ffdf00"/>
+    <rect x="2" y="52" width="60" height="3.34" fill="#34d327"/>
+    <rect x="2" y="55.33" width="60" height="3.34" fill="#2ea8ff"/>
+    <rect x="2" y="58.66" width="60" height="3.34" fill="#a259ff"/>
+  </g>
+
+  <g>
+    <rect x="2" y="28" width="8" height="4" rx="2" fill="#9c9c9c"/>
+    <rect x="0" y="23" width="7" height="4" rx="2" fill="#6f6f6f"/>
+    <rect x="2" y="18" width="6" height="4" rx="2" fill="#9c9c9c"/>
+  </g>
+
+  <g>
+    <rect x="12" y="38" width="5" height="8" fill="#e6e6e6"/>
+    <rect x="20" y="38" width="5" height="8" fill="#e6e6e6"/>
+    <rect x="28" y="38" width="5" height="8" fill="#e6e6e6"/>
+    <rect x="35" y="38" width="4" height="8" fill="#e6e6e6"/>
+  </g>
+
+  <rect x="8" y="14" width="26" height="26" rx="4" fill="#f2a6d0" stroke="#b85f92" stroke-width="2"/>
+  <rect x="12" y="18" width="18" height="18" rx="2" fill="#ffd0e9"/>
+  <g>
+    <rect x="14" y="22" width="4" height="2" fill="#5fd0ff"/>
+    <rect x="22" y="21" width="4" height="2" fill="#ffe066"/>
+    <rect x="24" y="27" width="4" height="2" fill="#5fd0ff"/>
+    <rect x="15" y="30" width="4" height="2" fill="#ffe066"/>
+    <rect x="20" y="25" width="2" height="2" fill="#ff8fa7"/>
+    <rect x="26" y="32" width="3" height="2" fill="#ff8fa7"/>
+  </g>
+
+  <g>
+    <rect x="38" y="4" width="5" height="10" rx="1" fill="#a6a6a6"/>
+    <rect x="49" y="4" width="5" height="10" rx="1" fill="#a6a6a6"/>
+    <rect x="39.2" y="6" width="2.6" height="6" rx="1" fill="#f2a6c4"/>
+    <rect x="50.2" y="6" width="2.6" height="6" rx="1" fill="#f2a6c4"/>
+  </g>
+
+  <rect x="33" y="10" width="21" height="22" rx="6" fill="#a6a6a6"/>
+  <rect x="37" y="18" width="14" height="9" rx="3" fill="#cfcfcf"/>
+
+  <g>
+    <rect x="39" y="16" width="3" height="6" rx="1" fill="#262626"/>
+    <rect x="47" y="16" width="3" height="6" rx="1" fill="#262626"/>
+    <rect x="39.6" y="17" width="1" height="1.6" fill="#ffffff"/>
+    <rect x="47.6" y="17" width="1" height="1.6" fill="#ffffff"/>
+  </g>
+
+  <rect x="34" y="25" width="4" height="3" rx="1.5" fill="#ff92b8"/>
+  <rect x="51" y="25" width="4" height="3" rx="1.5" fill="#ff92b8"/>
+
+  <path d="M43 26 L45 29 L47 26" fill="none" stroke="#6d4b57" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <path d="M56 12 L57.2 15.8 L61 17 L57.2 18.2 L56 22 L54.8 18.2 L51 17 L54.8 15.8 Z" fill="#fff6a8"/>
+  <path d="M55 2 L55.8 4.2 L58 5 L55.8 5.8 L55 8 L54.2 5.8 L52 5 L54.2 4.2 Z" fill="#ffffff"/>
+</svg>
