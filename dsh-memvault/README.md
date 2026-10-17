@@ -43,10 +43,17 @@ token), an identity picker, a bucket picker (loaded through
 `memvault_bucket_list`, plus a manual 64-hex field), a read-only/read-write
 switch, **Apply to session**, and **Clear ACL**. Polling is every 3 s.
 
+An identity added from the panel also has **Remove…**: it disposes that
+identity's connection, clears every session binding to it, and drops its
+record (the agent id can be added again with a new token). An optional
+checkbox also deletes the credential directory — allowed only when it is the
+default `<dataDir>/agents/<agentId>` and holds nothing but the private key.
+Identities defined by the plugin row are not removable from the panel; disable
+them there, or edit the row config.
+
 The panel talks to the host half over authenticated JSON routes under
 `/api/memvault/…` registered through `ctx.connection.fetch` (same-origin cookie,
-Connection's owner peer and origin fence). Routes: `state`, `redeem`,
-`enabled`, `check`, `buckets`, `session`.
+Connection's owner peer and origin fence). Routes: `state`, `redeem`, `enabled`, `check`, `buckets`, `session`, `remove`.
 
 ## Configuration
 

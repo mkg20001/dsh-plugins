@@ -88,8 +88,11 @@ window.__ModuleLoader__.load({
     }
 
     /** One identity card: status, check, enable toggle, redeem. */
-    function IdentityCard({ identity, selected, onSelect, onChange, busy }) {
+    function IdentityCard({ identity, selected, onSelect, onChange, onRemoved, busy }) {
       const [redeeming, setRedeeming] = React.useState(false)
+      const [removing, setRemoving] = React.useState(false)
+      const [withKey, setWithKey] = React.useState(false)
+      const [notice, setNotice] = React.useState(null)
       const [token, setToken] = React.useState('')
       const [check, setCheck] = React.useState(null)
       const [error, setError] = React.useState(null)
@@ -134,6 +137,7 @@ window.__ModuleLoader__.load({
         ),
         h('div', { className: 'dsmv-mono' }, identity.server),
         error === null ? null : h('div', { className: 'dsmv-error' }, error),
+        notice === null ? null : h('div', { className: 'dsmv-note' }, notice),
         check === null
           ? null
           : h(
@@ -179,6 +183,18 @@ window.__ModuleLoader__.load({
             { type: 'button', disabled: busy || working, onClick: () => setRedeeming(!redeeming) },
             'Redeem…',
           ),
+          identity.source === 'config'
+            ? h('span', { className: 'dsmv-note' }, 'from the plugin row')
+            : h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'danger',
+                  disabled: busy || working,
+                  onClick: () => { setRemoving(true); setRedeeming(false) },
+                },
+                'Remove…',
+              ),
         ),
         redeeming
           ? h(
@@ -221,6 +237,53 @@ window.__ModuleLoader__.load({
                   { type: 'button', onClick: () => { setRedeeming(false); setToken('') } },
                   'Cancel',
                 ),
+              ),
+            )
+          : null,
+        removing
+          ? h(
+              'div',
+              { className: 'dsmv-section' },
+              h('div', { className: 'dsmv-label' }, `Remove identity "${identity.label}"?`),
+              h('div', { className: 'dsmv-note' },
+                'The identity record, its connection, and any session bindings to it are removed. ' +
+                  'Its agent id can be added again with a new token.'),
+              h(
+                'label',
+                { className: 'dsmv-row' },
+                h('input', {
+                  type: 'checkbox',
+                  checked: withKey,
+                  onChange: (event) => setWithKey(event.target.checked),
+                }),
+                h('span', { className: 'dsmv-note' }, `also delete the private key at ${identity.identityDir}`),
+              ),
+              h(
+                'div',
+                { className: 'dsmv-row' },
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'danger',
+                    disabled: working,
+                    onClick: () =>
+                      run(async () => {
+                        const result = await api('remove', {
+                          identityId: identity.id,
+                          deleteCredential: withKey,
+                        })
+                        setRemoving(false)
+                        setWithKey(false)
+                        if (result.warning !== undefined) setNotice(result.warning)
+                        else if (result.clearedSessions > 0) setNotice(`cleared ${result.clearedSessions} session binding(s)`)
+                        onRemoved?.(identity.id)
+                        await onChange()
+                      }),
+                  },
+                  'Delete identity',
+                ),
+                h('button', { type: 'button', onClick: () => { setRemoving(false); setWithKey(false) } }, 'Cancel'),
               ),
             )
           : null,
@@ -314,6 +377,7 @@ window.__ModuleLoader__.load({
         h('style', { 'data-plugin': '@local/memvault' }, PANEL_CSS),
         h('h3', null, 'Memvault session'),
         error === null ? null : h('div', { className: 'dsmv-error' }, error),
+        notice === null ? null : h('div', { className: 'dsmv-note' }, notice),
 
         h(
           'div',
@@ -430,6 +494,13 @@ window.__ModuleLoader__.load({
                 selected: item.id === identity,
                 onSelect: setIdentity,
                 onChange: refresh,
+                onRemoved: (id) => {
+                  if (id === identity) {
+                    setIdentity('')
+                    setBucket('')
+                    setBuckets(null)
+                  }
+                },
                 busy,
               }),
             ),

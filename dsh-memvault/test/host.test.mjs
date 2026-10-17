@@ -62,8 +62,9 @@ function makeHost({ stateFile, dataDir }) {
     },
     provide(name, value) { ctx.services[name] = value },
     plugin(ns, config) {
-      children.push({ ns, config })
-      return { dispose() {} }
+      const child = { ns, config, disposed: false }
+      children.push(child)
+      return { dispose() { child.disposed = true } }
     },
     on(event, fn) {
       listeners.set(event, [...(listeners.get(event) ?? []), fn])
@@ -190,8 +191,9 @@ const stateFile = join(dataDir, 'dsh-state.json')
   const snapshot = host.ctx.services.memvault.snapshot('s1')
   eq(snapshot.identities[0]?.status, 'connected', 'identity reports connected when its tools exist')
   eq(snapshot.acl, null, 'no ACL by default')
-  await waitFor(() => host.ctx.routes.size === 6, 'six panel routes registered')
+  await waitFor(() => host.ctx.routes.size === 7, 'seven panel routes registered')
   ok(host.ctx.routes.has('/api/memvault/session'), 'session route registered')
+  ok(host.ctx.routes.has('/api/memvault/remove'), 'remove route registered')
 
   // --- per-session ACL ------------------------------------------------------
   host.addAgent('s1')
@@ -346,6 +348,37 @@ await writeFile(join(dir, 'private_key.pem'), 'stub\\n')
   const saved = JSON.parse(await readFile(stateFile, 'utf8'))
   eq(saved.identities.length, 2, 'new identity persisted')
   ok(!JSON.stringify(saved).includes('mvjoin1:secret'), 'token never persisted')
+
+  // --- removing the identity -------------------------------------------------
+  await host.ctx.services.memvault.setSessionAcl('s3', { identity: 'work', bucket: null, mode: 'read' })
+  eq(host.ctx.services.memvault.snapshot('s3').acl?.identity, 'work', 'session bound to the new identity')
+  const removed = await host.ctx.services.memvault.remove('work', { deleteCredential: true })
+  eq(removed.identities.length, 1, 'identity record removed')
+  eq(removed.clearedSessions, 1, 'session binding cleared')
+  eq(removed.acl, null, 'cleared session has no ACL')
+  ok(removed.warning === undefined, 'credential directory removed without a warning')
+  let keyGone = false
+  try { await access(join(dataDir, 'agents', 'work', 'private_key.pem')) } catch { keyGone = true }
+  ok(keyGone, 'private key deleted on request')
+  ok(
+    host.ctx.children
+      .filter((child) => child.config.serverName === 'memvault_work')
+      .every((child) => child.disposed === true),
+    'the removed identity connection was disposed',
+  )
+  eq(
+    JSON.parse(await readFile(stateFile, 'utf8')).sessions.s3,
+    undefined,
+    'cleared binding persisted',
+  )
+
+  let configError
+  try { await host.ctx.services.memvault.remove('dsh') } catch (failure) { configError = String(failure.message) }
+  ok(configError?.includes('defined by the plugin configuration'), 'configured identity cannot be removed')
+
+  let unknownError
+  try { await host.ctx.services.memvault.remove('nope') } catch (failure) { unknownError = String(failure.message) }
+  ok(unknownError?.includes('unknown identity'), 'unknown identity rejected')
 }
 
 // --- API rejects a bad ACL --------------------------------------------------

@@ -22,7 +22,7 @@
  */
 
 import { spawn } from 'node:child_process'
-import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { access, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
@@ -298,6 +298,31 @@ async function hasIdentity(identityDir) {
   } catch {
     return false
   }
+}
+
+/**
+ * Remove the credential directory of a deleted identity, but only the default
+ * one for its agent id and only while it holds nothing but the private key.
+ */
+async function removeCredentialDir(identity, settings) {
+  const target = resolve(identity.identityDir)
+  const expected = resolve(join(settings.dataDirRoot, 'agents', identity.agentId))
+  if (target !== expected) {
+    throw new Error(
+      `kept the credential: ${target} is not the default identity directory for "${identity.agentId}"`,
+    )
+  }
+  let entries
+  try {
+    entries = await readdir(target)
+  } catch {
+    return
+  }
+  const unexpected = entries.filter((name) => name !== KEY_FILE)
+  if (unexpected.length > 0) {
+    throw new Error(`kept the credential: ${target} still contains ${unexpected.join(', ')}`)
+  }
+  await rm(target, { recursive: true, force: true })
 }
 
 /** Spawn a child process, capture its output, and settle on exit, failure, or timeout. */
@@ -850,6 +875,42 @@ export function apply(ctx, config) {
       }))
     },
 
+    async remove(identityId, { deleteCredential = false } = {}) {
+      await whenReady()
+      const identity = identities.find((item) => item.id === identityId)
+      if (identity === undefined) throw new Error(`memvault: unknown identity "${identityId}"`)
+      if (identity.source === 'config') {
+        throw new Error(
+          `memvault: "${identity.id}" is defined by the plugin configuration — disable it here, ` +
+            `or remove its entry from the row config`,
+        )
+      }
+      const child = connections.get(identity.id)
+      connections.delete(identity.id)
+      await child?.dispose?.()
+      let clearedSessions = 0
+      for (const [sessionId, acl] of Object.entries(state.sessions)) {
+        if (acl.identity !== identity.id) continue
+        removeAcl(sessionId)
+        clearedSessions += 1
+      }
+      identities = identities.filter((item) => item.id !== identity.id)
+      await persist()
+      let warning
+      if (deleteCredential === true) {
+        try {
+          await removeCredentialDir(identity, settings)
+        } catch (error) {
+          warning = String(error?.message ?? error)
+        }
+      }
+      return {
+        ...snapshot(),
+        clearedSessions,
+        ...(warning === undefined ? {} : { warning }),
+      }
+    },
+
     async setSessionAcl(sessionId, acl) {
       await whenReady()
       if (typeof sessionId !== 'string' || sessionId === '') {
@@ -965,6 +1026,16 @@ export function apply(ctx, config) {
       if (body === undefined) return json({ ok: false, error: 'invalid JSON body' }, 400)
       try {
         return json({ ok: true, buckets: await service.buckets(body.identityId) })
+      } catch (error) {
+        return json({ ok: false, error: String(error?.message ?? error) }, 400)
+      }
+    })
+
+    register('/api/memvault/remove', ['POST'], async (request) => {
+      const body = await bodyOf(request)
+      if (body === undefined) return json({ ok: false, error: 'invalid JSON body' }, 400)
+      try {
+        return json({ ok: true, ...(await service.remove(body.identityId, { deleteCredential: body.deleteCredential === true })) })
       } catch (error) {
         return json({ ok: false, error: String(error?.message ?? error) }, 400)
       }
