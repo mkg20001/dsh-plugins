@@ -1,24 +1,36 @@
 {
-  "name": "@local/dsh-memvault",
-  "version": "1.0.0",
+  "name": "@local/memvault",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "Redeems a memvault provisioning token for this agent and connects memvault's MCP tools.",
+  "description": "Memvault identities, per-session bucket ACL, and a right-sidebar panel for tokens, connections, and access.",
   "exports": {
     ".": "./index.js",
+    "./client": "./client.js",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
   "files": [
     "index.js",
+    "client.js",
     "cordis.patch.yml",
     "locale/*.json",
     "icon.svg",
-    "README.md"
+    "README.md",
+    "test/*.mjs"
   ],
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
+      ]
     }
+  },
+  "scripts": {
+    "test": "node test/host.test.mjs"
   }
 }

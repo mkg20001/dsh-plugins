@@ -1,21 +1,34 @@
-# Memvault agent connection.
+# Memvault identities, per-session bucket ACL, and the right-sidebar panel.
 #
 # The provisioning token is read from MEMVAULT_TOKEN (falling back to
-# MEMVAULT_JOIN_TOKEN) at activation; do not paste a token here unless you
-# cannot set the environment variable. The agent id names the identity
-# directory, the memvault bucket label, and the tool namespace
-# (`mcp__<serverName>__<memvault tool>`).
+# MEMVAULT_JOIN_TOKEN) at activation; the panel can also redeem a token for a
+# configured identity or a new one. A token is never written to the state file
+# and never reaches the long-lived MCP server process.
+#
+# Each identity is one agent: its id names the identity directory
+# (`<dataDir>/agents/<agentId>/`), the memvault bucket label, and its tool
+# namespace. The first identity keeps the plain `serverName`; the others get
+# `<serverName>_<slug>` so their tools never collide.
 - insert:
     - id: memvault
-      name: '@local/dsh-memvault'
+      name: '@local/memvault'
       config:
         server: 'http://127.0.0.1:8401'
         agentId: 'dsh'
         serverName: 'memvault'
         defaultVisibility: 'internal'
+        # identities:                   # optional; defaults to the single agentId above
+        #   - id: dsh
+        #     agentId: dsh
+        #     label: Default agent
+        #   - id: work
+        #     agentId: work
+        #     server: 'https://vault.work.example'
         # Optional:
         # token: 'mvjoin1:...'          # or MEMVAULT_TOKEN
         # identityDir: '/home/me/.local/share/memvault/agents/dsh'
+        # dataDir: '/home/me/.local/share/memvault'   # state file + default identity dirs
+        # stateFile: '/home/me/.local/share/memvault/dsh-state.json'
         # command: '/home/me/.nix-profile/bin/memvault-mcp'
         # defaultTags: ['agent:dsh']
         # ttlSecs: 2592000              # credential lifetime; default never expires
