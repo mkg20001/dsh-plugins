@@ -1,6 +1,7 @@
 /**
- * Client half of the memvault plugin: a right-sidebar tab with the identity
- * list, connection checks, token redemption, and the per-session ACL picker.
+ * Client half of the memvault plugin: a conversation View tab (next to Chat
+ * and Trajectory) with the identity list, connection checks, token redemption,
+ * and the per-session ACL picker.
  *
  * The panel reads and writes the host state through the authenticated JSON
  * routes the host half mounts under `/api/memvault/…` (same-origin fetch, the
@@ -14,13 +15,13 @@ window.__ModuleLoader__.load({
     const React = require('react')
     const h = React.createElement
 
-    const TAB_ID = '@local/memvault'
-    const TAB_KIND = 'memvault'
+    const VIEW_ID = 'memvault'
     const API = '/api/memvault'
     const PANEL_CSS = `
-      .dsmv { display: flex; flex-direction: column; gap: 14px; padding: 14px;
-        font-size: 12.5px; line-height: 1.45; color: var(--dsw-alias-label-primary);
-        overflow: auto; height: 100%; box-sizing: border-box; }
+      .dsmv { display: flex; flex-direction: column; gap: 14px;
+        padding: 18px 20px 40px; font-size: 12.5px; line-height: 1.45;
+        color: var(--dsw-alias-label-primary); box-sizing: border-box;
+        width: 100%; max-width: 780px; align-self: center; }
       .dsmv h3 { margin: 0; font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
         color: var(--dsw-alias-label-secondary); font-weight: 600; }
       .dsmv-section { display: flex; flex-direction: column; gap: 8px;
@@ -308,7 +309,7 @@ window.__ModuleLoader__.load({
       return h(
         'div',
         { className: 'dsmv' },
-        h('style', { 'data-plugin': TAB_ID }, PANEL_CSS),
+        h('style', { 'data-plugin': '@local/memvault' }, PANEL_CSS),
         h('h3', null, 'Memvault session'),
         error === null ? null : h('div', { className: 'dsmv-error' }, error),
 
@@ -486,53 +487,25 @@ window.__ModuleLoader__.load({
     }
 
     return {
-      inject: ['slots', 'sidebarRightTabs', 'sidebarRight'],
+      inject: ['slots'],
       apply(ctx) {
-        ctx.effect(() => {
-          // A rapid unload/reload can re-run this module before the previous
-          // fiber released its tab-type id; retry briefly instead of losing the
-          // type (and with it the guide entry) for the whole page session.
-          let disposed = false
-          let disposeType
-          let attempts = 0
-          const registerType = () => {
-            if (disposed) return
-            try {
-              disposeType = ctx.sidebarRightTabs.register({
-                id: TAB_ID,
-                kind: TAB_KIND,
-                title: () => 'Memvault',
-                guide: [
-                  {
-                    id: 'open',
-                    order: 60,
-                    title: () => 'Memvault',
-                    description: () => 'Identities, connection checks, and the per-session bucket ACL',
-                  },
-                ],
-              })
-            } catch (error) {
-              if (attempts < 10) {
-                attempts += 1
-                setTimeout(registerType, 150)
-                return
-              }
-              console.error('memvault: could not register the sidebar tab', error)
-            }
-          }
-          registerType()
-          return () => {
-            disposed = true
-            disposeType?.()
-          }
-        }, 'memvault: tab type')
-
+        // The tab lives in the conversation's View ring, next to Chat and
+        // Trajectory. `inject` waits for the owner's slot declaration, so a
+        // plugin load order that precedes ui-conversation still lands here.
         ctx.effect(
           () =>
-            ctx.slots.inject('sidebar.right.pane.tab', () =>
-              ctx.slots.register({ name: 'sidebar.right.pane.tab', key: TAB_ID }, MemvaultPanel),
+            ctx.slots.inject('conversation.view', () =>
+              ctx.slots.register(
+                {
+                  name: 'conversation.view',
+                  id: VIEW_ID,
+                  order: 20,
+                  label: () => 'Memvault',
+                },
+                MemvaultPanel,
+              ),
             ),
-          'memvault: tab body',
+          'memvault: conversation view',
         )
       },
     }

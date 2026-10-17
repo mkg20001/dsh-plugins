@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Memvault 智能体连接",
-    "description": "使用 memvault 配置令牌为本智能体兑换身份，然后连接 memvault 的 MCP 工具（文档、知识图谱、VFS、技能、审计）。"
+    "title": "Memvault",
+    "description": "在会话标签页中管理 memvault 身份和会话级存储桶 ACL，支持令牌兑换和连接检查。"
   }
 }

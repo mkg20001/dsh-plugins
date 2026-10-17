@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Memvault Agent Connection",
-    "description": "Redeems a memvault provisioning token for this agent, then connects memvault's MCP tools (documents, knowledge graph, VFS, skills, audit)."
+    "title": "Memvault",
+    "description": "Memvault identities and the per-session bucket ACL, with token redemption and connection checks in a conversation tab."
   }
 }

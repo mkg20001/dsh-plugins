@@ -1,4 +1,4 @@
-# Memvault identities, per-session bucket ACL, and the right-sidebar panel.
+# Memvault identities, per-session bucket ACL, and the conversation-tab panel.
 #
 # The provisioning token is read from MEMVAULT_TOKEN (falling back to
 # MEMVAULT_JOIN_TOKEN) at activation; the panel can also redeem a token for a

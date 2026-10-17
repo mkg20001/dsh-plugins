@@ -2,7 +2,8 @@
 
 DeepSeek Harness plugin for memvault: it owns one or more **agent identities**,
 connects each as an MCP server, and enforces a **per-session local ACL** over
-identities and buckets. A right-sidebar panel (tab type `memvault`) is the UI.
+identities and buckets. The UI is a conversation View tab (`memvault`) next to
+Chat and Trajectory.
 
 ## What it does
 
@@ -34,8 +35,8 @@ identities and buckets. A right-sidebar panel (tab type `memvault`) is the UI.
 
 ## Panel
 
-Right sidebar → `+` → **Memvault** (the tab type also contributes a guide
-entry). The panel shows each identity with its status
+Open the **Memvault** tab in the conversation's view ring (next to Chat and
+Trajectory). The panel shows each identity with its status
 (`connected`/`pending`/`disabled`/`unconfigured`), tool count, **Check**
 (executes `memvault_status`), **Enable/Disable**, **Redeem…** (single-use
 token), an identity picker, a bucket picker (loaded through
