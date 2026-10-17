@@ -488,23 +488,44 @@ window.__ModuleLoader__.load({
     return {
       inject: ['slots', 'sidebarRightTabs', 'sidebarRight'],
       apply(ctx) {
-        ctx.effect(
-          () =>
-            ctx.sidebarRightTabs.register({
-              id: TAB_ID,
-              kind: TAB_KIND,
-              title: () => 'Memvault',
-              guide: [
-                {
-                  id: 'open',
-                  order: 60,
-                  title: () => 'Memvault',
-                  description: () => 'Identities, connection checks, and the per-session bucket ACL',
-                },
-              ],
-            }),
-          'memvault: tab type',
-        )
+        ctx.effect(() => {
+          // A rapid unload/reload can re-run this module before the previous
+          // fiber released its tab-type id; retry briefly instead of losing the
+          // type (and with it the guide entry) for the whole page session.
+          let disposed = false
+          let disposeType
+          let attempts = 0
+          const registerType = () => {
+            if (disposed) return
+            try {
+              disposeType = ctx.sidebarRightTabs.register({
+                id: TAB_ID,
+                kind: TAB_KIND,
+                title: () => 'Memvault',
+                guide: [
+                  {
+                    id: 'open',
+                    order: 60,
+                    title: () => 'Memvault',
+                    description: () => 'Identities, connection checks, and the per-session bucket ACL',
+                  },
+                ],
+              })
+            } catch (error) {
+              if (attempts < 10) {
+                attempts += 1
+                setTimeout(registerType, 150)
+                return
+              }
+              console.error('memvault: could not register the sidebar tab', error)
+            }
+          }
+          registerType()
+          return () => {
+            disposed = true
+            disposeType?.()
+          }
+        }, 'memvault: tab type')
 
         ctx.effect(
           () =>
