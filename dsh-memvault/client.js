@@ -403,10 +403,11 @@ window.__ModuleLoader__.load({
         return () => clearInterval(timer)
       }, [refresh])
 
-      // With no binding, start on the first identity so the Access tab is usable.
+      // With no binding, start on a usable identity so the Access tab pre-loads.
       React.useEffect(() => {
         if (identity !== '' || ids.length === 0) return
-        setIdentity(ids[0].id)
+        const usable = ids.find((item) => item.status === 'connected') ?? ids[0]
+        setIdentity(usable.id)
       }, [identity, ids])
 
       // Follow a binding when it changes (it may have been set elsewhere).
