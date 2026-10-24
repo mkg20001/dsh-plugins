@@ -76,22 +76,31 @@ function makeHost({ stateFile, dataDir }) {
       get: (name) => schema.find((item) => item.name === name),
       execute: async (input) => {
         executed.push(input)
-        const raw = input.name.slice(input.name.lastIndexOf('__') + 2)
-        if (raw === 'memvault_status') {
-          return { content: [{ type: 'text', text: JSON.stringify({ doc_count: 3, peer_count: 1 }) }] }
-        }
-        if (raw === 'memvault_bucket_list') {
-          return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify([
-                { id: 'a'.repeat(64), name: 'Agent dsh', role: 'agent', envelope_count: 5, is_attached: true },
-                { id: 'b'.repeat(64), name: 'Team', role: 'standard', envelope_count: 2, is_attached: true },
-              ]),
-            }],
+        const results = input.calls.map((call) => {
+          const raw = call.name.slice(call.name.lastIndexOf('__') + 2)
+          if (raw === 'memvault_status') {
+            return {
+              callId: call.id,
+              result: { content: [{ type: 'text', text: JSON.stringify({ doc_count: 3, peer_count: 1 }) }] },
+            }
           }
-        }
-        return { content: [{ type: 'text', text: 'error: boom' }] }
+          if (raw === 'memvault_bucket_list') {
+            return {
+              callId: call.id,
+              result: {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify([
+                    { id: 'a'.repeat(64), name: 'Agent dsh', role: 'agent', envelope_count: 5, is_attached: true },
+                    { id: 'b'.repeat(64), name: 'Team', role: 'standard', envelope_count: 2, is_attached: true },
+                  ]),
+                }],
+              },
+            }
+          }
+          return { callId: call.id, result: { content: [{ type: 'text', text: 'error: boom' }] } }
+        })
+        return { results, additionalContexts: [], concluded: false }
       },
     },
     inject(_names, callback) { callback(ctx) },
@@ -289,7 +298,11 @@ const stateFile = join(dataDir, 'dsh-state.json')
   const buckets = await host.ctx.services.memvault.buckets('dsh')
   eq(buckets.length, 2, 'bucket list parsed')
   eq(buckets[1].name, 'Team', 'bucket name parsed')
-  ok(host.ctx.executed.every((call) => call.name.startsWith('mcp__memvault__')), 'host calls run through the registry')
+  ok(
+    host.ctx.executed.every((batch) => batch.calls.every((call) => call.name.startsWith('mcp__memvault__'))),
+    'host calls run through the registry',
+  )
+  ok(host.ctx.executed.every((batch) => batch.calls.every((call) => call.type === 'tool-call')), 'host calls are tool-call blocks')
 
   // --- persistence ----------------------------------------------------------
   const saved = JSON.parse(await readFile(stateFile, 'utf8'))

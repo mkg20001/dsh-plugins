@@ -491,12 +491,13 @@ function textOf(result) {
 
 /** Run one tool through the registry and return its text projection. */
 async function callTool(ctx, toolName, args) {
-  const result = await ctx.tools.execute({
-    callId: `memvault:${randomBytes(4).toString('hex')}`,
-    name: toolName,
-    arguments: args,
+  // The registry executes whole batches; one panel action is a one-call batch.
+  const callId = `memvault:${randomBytes(4).toString('hex')}`
+  const batch = await ctx.tools.execute({
+    calls: [{ type: 'tool-call', id: callId, name: toolName, arguments: JSON.stringify(args) }],
     signal: new AbortController().signal,
   })
+  const result = batch?.results?.find((entry) => entry.callId === callId)?.result
   return { text: textOf(result), isError: result?.isError === true }
 }
 

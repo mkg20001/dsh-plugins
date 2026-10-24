@@ -51,7 +51,16 @@ function makeHost() {
       get: (name) => schema.find((entry) => entry.name === name),
       execute: async (input) => {
         executed.push(input)
-        return { content: [{ type: 'text', text: JSON.stringify({ ran: input.name, args: input.arguments }) }] }
+        const results = input.calls.map((call) => ({
+          callId: call.id,
+          result: {
+            content: [{
+              type: 'text',
+              text: JSON.stringify({ ran: call.name, args: JSON.parse(call.arguments) }),
+            }],
+          },
+        }))
+        return { results, additionalContexts: [], concluded: false }
       },
     },
     plugin(namespace, config) {
@@ -221,7 +230,10 @@ function post(route, body) {
   const good = await (await post(callRoute, { name: 'projects', args: {} })).json()
   eq(good.ok, true, 'call succeeds')
   ok(good.text.includes('mcp__reagent__projects'), 'call ran the namespaced tool')
-  eq(host.ctx.executed.at(-1).name, 'mcp__reagent__projects', 'executed through the registry')
+  const executedCall = host.ctx.executed.at(-1).calls[0]
+  eq(executedCall.name, 'mcp__reagent__projects', 'executed through the registry')
+  eq(executedCall.type, 'tool-call', 'executed as a tool-call block')
+  eq(JSON.parse(executedCall.arguments), {}, 'arguments travel as model JSON')
 
   const unknown = await post(callRoute, { name: 'nope', args: {} })
   eq(unknown.status, 503, 'unknown tool is 503')

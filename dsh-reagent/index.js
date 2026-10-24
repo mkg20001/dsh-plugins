@@ -462,12 +462,13 @@ export function apply(ctx, config) {
           503,
         )
       }
-      const result = await ctx.tools.execute({
-        callId: `reagent:${randomBytes(6).toString('hex')}`,
-        name: toolName,
-        arguments: args,
+      // The registry executes whole batches; one panel action is a one-call batch.
+      const callId = `reagent:${randomBytes(6).toString('hex')}`
+      const batch = await ctx.tools.execute({
+        calls: [{ type: 'tool-call', id: callId, name: toolName, arguments: JSON.stringify(args) }],
         signal: new AbortController().signal,
       })
+      const result = batch?.results?.find((entry) => entry.callId === callId)?.result
       return { isError: result?.isError === true, text: textOf(result) }
     },
   }
