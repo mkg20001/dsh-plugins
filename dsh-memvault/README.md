@@ -57,6 +57,8 @@ list.
 
 State polling is every 3 s.
 
+![The Memvault tab: identity table above, session access below](preview.png)
+
 An identity added from the panel also has **Remove…**: it disposes that
 identity's connection, clears every session binding to it, and drops its
 record (the agent id can be added again with a new token). An optional

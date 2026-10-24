@@ -17,7 +17,8 @@
     "locale/*.json",
     "icon.svg",
     "README.md",
-    "test/*.mjs"
+    "test/*.mjs",
+    "preview.png"
   ],
   "dsh": {
     "bundle": {
