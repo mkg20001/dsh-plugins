@@ -275,6 +275,14 @@ async function loadState(file, identities) {
     if (previous.source === 'ui') merged.push(previous)
   }
   state.identities = merged
+  // Sessions stored before the scoped form are read as one bucket entry; an
+  // entry that no longer normalizes is dropped.
+  const sessions = {}
+  for (const [sessionId, stored] of Object.entries(state.sessions)) {
+    const normalized = normalizeAcl(stored)
+    if (normalized !== undefined) sessions[sessionId] = stored.scope === undefined ? normalized : stored
+  }
+  state.sessions = sessions
   return state
 }
 
@@ -507,67 +515,154 @@ function namespaceTools(ctx, identity) {
 // ---------------------------------------------------------------------------
 
 /**
- * Work out what one session's binding hides: the other identities' tools, the
- * write tools of a read-only session, and the bucket guard. Pure, so the caller
- * can compare the signature before touching the live agent.
+ * Normalize a stored or submitted session binding. The scoped form has a
+ * `scope` of `all`, `identities`, or `buckets`; the older single-identity
+ * shape ({ identity, bucket, mode }) is read as one bucket entry.
  */
-function planSessionAcl(ctx, acl, identities) {
-  const identity = identities.find((item) => item.id === acl.identity)
-  if (identity === undefined) return undefined
-  const ownPrefix = `mcp__${identity.serverName}__`
-  const known = new Set(ctx.tools.schemas().map((schema) => schema.name))
-  const foreign = new Set()
-  for (const other of identities) {
-    if (other.id === identity.id) continue
-    for (const raw of namespaceTools(ctx, other)) foreign.add(`mcp__${other.serverName}__${raw}`)
+function normalizeAcl(acl) {
+  if (acl === null || acl === undefined || typeof acl !== 'object') return undefined
+  const mode = acl.mode === 'read' ? 'read' : 'write'
+  if (acl.scope === 'all') return { scope: 'all', mode, identities: [], buckets: [] }
+
+  if (acl.scope === 'identities' && Array.isArray(acl.identities)) {
+    const names = [...new Set(acl.identities.filter((id) => typeof id === 'string' && id !== ''))]
+    return { scope: 'identities', mode, identities: names, buckets: [] }
   }
+
+  if (acl.scope === 'buckets' && Array.isArray(acl.buckets)) {
+    const buckets = []
+    for (const entry of acl.buckets) {
+      if (entry === null || typeof entry !== 'object') continue
+      if (typeof entry.identity !== 'string' || entry.identity === '') continue
+      const bucket =
+        typeof entry.bucket === 'string' && entry.bucket.trim() !== ''
+          ? entry.bucket.trim().toLowerCase()
+          : null
+      if (bucket !== null && !/^[0-9a-f]{64}$/.test(bucket)) continue
+      if (buckets.some((item) => item.identity === entry.identity && item.bucket === bucket)) continue
+      buckets.push({ identity: entry.identity, bucket })
+    }
+    return {
+      scope: 'buckets',
+      mode,
+      identities: [...new Set(buckets.map((entry) => entry.identity))],
+      buckets,
+    }
+  }
+
+  // Legacy single-identity binding.
+  if (typeof acl.identity === 'string' && acl.identity !== '') {
+    const bucket =
+      typeof acl.bucket === 'string' && acl.bucket.trim() !== '' ? acl.bucket.trim().toLowerCase() : null
+    return {
+      scope: 'buckets',
+      mode,
+      identities: [acl.identity],
+      buckets: [{ identity: acl.identity, bucket }],
+    }
+  }
+  return undefined
+}
+
+/** Human list for guard messages. */
+function labelsOf(list) {
+  return list.map((item) => item.label ?? item.id).join(', ')
+}
+
+/**
+ * Work out what one session's binding hides: the tools of identities outside
+ * the scope, the write tools of a read-only session, and the bucket guard.
+ * Pure, so the caller can compare the signature before touching a live agent.
+ */
+function planSessionAcl(ctx, rawAcl, identities) {
+  const acl = normalizeAcl(rawAcl)
+  if (acl === undefined) return undefined
+
+  const allowedIds = acl.scope === 'all' ? identities.map((item) => item.id) : acl.identities
+  const allowedSet = new Set(allowedIds)
+  const allowed = identities.filter((item) => allowedSet.has(item.id))
+  const excluded = identities.filter((item) => !allowedSet.has(item.id))
+  const known = new Set(ctx.tools.schemas().map((schema) => schema.name))
+
+  const foreign = new Set()
+  for (const identity of excluded) {
+    for (const raw of namespaceTools(ctx, identity)) foreign.add(`mcp__${identity.serverName}__${raw}`)
+  }
+  const prefixes = new Map(allowed.map((identity) => [identity.id, `mcp__${identity.serverName}__`]))
   const deny = [...foreign]
   if (acl.mode === 'read') {
-    for (const raw of namespaceTools(ctx, identity)) {
-      if (!READ_TOOLS.has(raw)) deny.push(`${ownPrefix}${raw}`)
+    for (const identity of allowed) {
+      const prefix = prefixes.get(identity.id)
+      for (const raw of namespaceTools(ctx, identity)) {
+        if (!READ_TOOLS.has(raw)) deny.push(`${prefix}${raw}`)
+      }
     }
   }
   // `restrict()` rejects names that are not currently registered global tools.
-  const restrictable = deny.filter((toolName) => known.has(toolName)).sort()
-  const signature = JSON.stringify([acl.identity, acl.mode, acl.bucket ?? null, restrictable])
-  return { acl, identity, ownPrefix, foreign, restrictable, signature }
+  const restrictable = [...new Set(deny)].filter((toolName) => known.has(toolName)).sort()
+  const signature = JSON.stringify([
+    acl.scope,
+    acl.mode,
+    allowed.map((item) => item.id).sort(),
+    acl.buckets.map((entry) => `${entry.identity}:${entry.bucket ?? ''}`).sort(),
+    restrictable,
+  ])
+  return { acl, allowed, prefixes, foreign, restrictable, signature }
 }
 
 /**
  * Install one planned binding on a live agent: a deny mask that hides the
- * tools, a monotonic guard that enforces the bucket and read-only rules, and a
- * prompt section that tells the model what the session may do.
+ * tools outside the scope, a monotonic guard that enforces the read-only and
+ * bucket rules, and a prompt section that tells the model what the session
+ * may do.
  */
 function installSessionAcl(agent, plan) {
-  const { acl, identity, ownPrefix, foreign, restrictable } = plan
+  const { acl, allowed, prefixes, foreign, restrictable } = plan
   const disposers = []
   if (restrictable.length > 0) disposers.push(agent.ctx.tools.restrict({ deny: restrictable }))
+
+  const identityOf = (name) => {
+    for (const identity of allowed) {
+      const prefix = prefixes.get(identity.id)
+      if (name.startsWith(prefix)) return { identity, prefix }
+    }
+    return undefined
+  }
 
   disposers.push(
     agent.ctx.tools.guard((exec) => {
       if (typeof exec.name !== 'string') return undefined
       if (foreign.has(exec.name)) {
-        return `memvault ACL: this session uses the "${identity.label}" identity; other memvault identities are unavailable`
+        return (
+          `memvault ACL: this session allows ${labelsOf(allowed) || 'no identity'}; ` +
+          `other memvault identities are unavailable`
+        )
       }
-      if (!exec.name.startsWith(ownPrefix)) return undefined
-      const raw = exec.name.slice(ownPrefix.length)
+      const match = identityOf(exec.name)
+      if (match === undefined) return undefined
+      const raw = exec.name.slice(match.prefix.length)
       if (acl.mode === 'read' && !READ_TOOLS.has(raw)) {
         return `memvault ACL: this session is read-only, so ${raw} is not available`
       }
+      if (acl.scope !== 'buckets') return undefined
+
       const args = exec.arguments !== null && typeof exec.arguments === 'object' ? exec.arguments : {}
       const bucket =
         typeof args.bucket === 'string' && args.bucket.trim() !== '' ? args.bucket.trim().toLowerCase() : undefined
-      if (acl.bucket !== null && acl.bucket !== undefined) {
-        if (bucket !== acl.bucket.toLowerCase()) {
-          return `memvault ACL: this session may only use bucket ${acl.bucket}; pass bucket: "${acl.bucket}"`
-        }
-      } else if (bucket !== undefined) {
+      const allowedBuckets = acl.buckets.filter((entry) => entry.identity === match.identity.id)
+      if (bucket === undefined) {
+        if (allowedBuckets.some((entry) => entry.bucket === null)) return undefined
+        const wanted = allowedBuckets.map((entry) => entry.bucket).filter((id) => id !== null)
         return (
-          `memvault ACL: this session is bound to the agent's own default bucket; ` +
-          `omit "bucket" instead of naming ${bucket}`
+          `memvault ACL: this session may only use ${wanted.length > 0 ? `bucket(s) ${wanted.join(', ')}` : 'the selected buckets'} ` +
+          `on ${match.identity.label}; pass "bucket"`
         )
       }
-      return undefined
+      if (allowedBuckets.some((entry) => entry.bucket === bucket)) return undefined
+      return (
+        `memvault ACL: bucket ${bucket} is not available to this session on ${match.identity.label}; ` +
+        `allowed: ${allowedBuckets.map((entry) => entry.bucket ?? 'agent default bucket').join(', ')}`
+      )
     }),
   )
 
@@ -576,18 +671,29 @@ function installSessionAcl(agent, plan) {
       name: ACL_SECTION,
       order: ACL_ORDER,
       text: () => {
-        const where =
-          acl.bucket === null || acl.bucket === undefined
-            ? `the identity's own default bucket (omit \`bucket\` in memvault calls)`
-            : `bucket \`${acl.bucket}\` (pass \`bucket: "${acl.bucket}"\` on every memvault call)`
         const access = acl.mode === 'read' ? 'read-only (write tools are disabled)' : 'read-write'
+        const scope =
+          acl.scope === 'all'
+            ? 'Every memvault identity and bucket is available.'
+            : acl.scope === 'identities'
+              ? `Only identities ${labelsOf(allowed)} are available, with all their buckets.`
+              : `Only these buckets are available: ${acl.buckets
+                  .map((entry) => {
+                    const owner = allowed.find((item) => item.id === entry.identity)
+                    return `${entry.bucket ?? 'agent default bucket'} (${owner?.label ?? entry.identity})`
+                  })
+                  .join('; ')}.`
         return [
           'Memvault session ACL (local, enforced by the harness):',
-          `- Identity: "${identity.label}" (${identity.agentId}); memvault tools are \`${ownPrefix}*\`.`,
-          `- Other memvault identities are unavailable to this session.`,
-          `- Bucket: ${where}.`,
+          `- ${scope}`,
+          acl.scope === 'all' ? '' : '- Other memvault identities are unavailable to this session.',
+          acl.scope === 'all'
+            ? `- MCP tools look like \`mcp__<namespace>__<tool>\`.`
+            : `- MCP tools look like ${[...prefixes.values()].map((prefix) => `\`${prefix}*\``).join(', ')}.`,
           `- Access: ${access}.`,
-        ].join('\n')
+        ]
+          .filter((line) => line !== '')
+          .join('\n')
       },
     }),
   )
@@ -890,7 +996,10 @@ export function apply(ctx, config) {
       await child?.dispose?.()
       let clearedSessions = 0
       for (const [sessionId, acl] of Object.entries(state.sessions)) {
-        if (acl.identity !== identity.id) continue
+        const bound =
+          acl.identity === identity.id ||
+          (Array.isArray(acl.identities) && acl.identities.includes(identity.id))
+        if (!bound) continue
         removeAcl(sessionId)
         clearedSessions += 1
       }
@@ -911,26 +1020,41 @@ export function apply(ctx, config) {
       }
     },
 
-    async setSessionAcl(sessionId, acl) {
+    async setSessionAcl(sessionId, rawAcl) {
       await whenReady()
       if (typeof sessionId !== 'string' || sessionId === '') {
         throw new Error('memvault: a session id is required')
       }
-      if (acl === null || acl === undefined) {
+      if (rawAcl === null || rawAcl === undefined) {
         removeAcl(sessionId)
         await persist()
         reapplyAll()
         return snapshot(sessionId)
       }
-      const identity = identities.find((item) => item.id === acl.identity)
-      if (identity === undefined) throw new Error(`memvault: unknown identity "${String(acl.identity)}"`)
-      const mode = acl.mode === 'read' ? 'read' : 'write'
-      const bucket =
-        typeof acl.bucket === 'string' && acl.bucket.trim() !== '' ? acl.bucket.trim().toLowerCase() : null
-      if (bucket !== null && !/^[0-9a-f]{64}$/.test(bucket)) {
-        throw new Error('memvault: a bucket id is 64 lowercase hex characters')
+      const acl = normalizeAcl(rawAcl)
+      if (acl === undefined) {
+        throw new Error('memvault: scope must be "all", "identities", or "buckets"')
       }
-      state.sessions[sessionId] = { identity: identity.id, bucket, mode, updatedAt: Date.now() }
+      if (acl.scope === 'identities') {
+        if (acl.identities.length === 0) throw new Error('memvault: choose at least one identity')
+      }
+      if (acl.scope === 'buckets' && acl.buckets.length === 0) {
+        throw new Error('memvault: choose at least one bucket')
+      }
+      for (const id of acl.identities) {
+        if (!identities.some((item) => item.id === id)) {
+          throw new Error(`memvault: unknown identity "${id}"`)
+        }
+      }
+      for (const entry of acl.buckets) {
+        if (!identities.some((item) => item.id === entry.identity)) {
+          throw new Error(`memvault: unknown identity "${entry.identity}"`)
+        }
+        if (entry.bucket !== null && !/^[0-9a-f]{64}$/.test(entry.bucket)) {
+          throw new Error('memvault: a bucket id is 64 lowercase hex characters')
+        }
+      }
+      state.sessions[sessionId] = { ...acl, updatedAt: Date.now() }
       await persist()
       reapplyAll()
       return snapshot(sessionId)

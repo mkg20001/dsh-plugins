@@ -195,14 +195,15 @@ const stateFile = join(dataDir, 'dsh-state.json')
   ok(host.ctx.routes.has('/api/memvault/session'), 'session route registered')
   ok(host.ctx.routes.has('/api/memvault/remove'), 'remove route registered')
 
-  // --- per-session ACL ------------------------------------------------------
+  // --- per-session ACL: bucket scope ---------------------------------------
   host.addAgent('s1')
   const applied = await host.ctx.services.memvault.setSessionAcl('s1', {
-    identity: 'dsh',
-    bucket: 'a'.repeat(64),
+    scope: 'buckets',
     mode: 'read',
+    buckets: [{ identity: 'dsh', bucket: 'a'.repeat(64) }],
   })
-  eq(applied.acl?.identity, 'dsh', 'ACL bound to the identity')
+  eq(applied.acl?.scope, 'buckets', 'ACL stored with the scoped form')
+  eq(applied.acl?.buckets?.[0]?.bucket, 'a'.repeat(64), 'bucket entry stored')
   eq(host.ctx.restrictions.length, 1, 'restriction installed')
   const denied = host.ctx.restrictions[0].filter.deny
   ok(denied.includes('mcp__memvault__memvault_put'), 'write tools denied in read-only mode')
@@ -216,8 +217,8 @@ const stateFile = join(dataDir, 'dsh-state.json')
 
   const guard = host.ctx.guardFns[0].fn
   ok(guard({ name: 'mcp__memvault__memvault_search', arguments: { bucket: 'a'.repeat(64) } }) === undefined, 'allowed bucket passes')
-  ok(guard({ name: 'mcp__memvault__memvault_search', arguments: {} })?.includes('only use bucket'), 'missing bucket denied when one is bound')
-  ok(guard({ name: 'mcp__memvault__memvault_search', arguments: { bucket: 'b'.repeat(64) } })?.includes('only use bucket'), 'other bucket denied')
+  ok(guard({ name: 'mcp__memvault__memvault_search', arguments: {} })?.includes('pass "bucket"'), 'missing bucket denied when one is bound')
+  ok(guard({ name: 'mcp__memvault__memvault_search', arguments: { bucket: 'b'.repeat(64) } })?.includes('not available'), 'other bucket denied')
   ok(guard({ name: 'mcp__memvault__memvault_put', arguments: { bucket: 'a'.repeat(64) } })?.includes('read-only'), 'write denied in read-only mode')
   ok(guard({ name: 'bash', arguments: {} }) === undefined, 'unrelated tools untouched')
 
@@ -225,7 +226,7 @@ const stateFile = join(dataDir, 'dsh-state.json')
   const stateRoute = host.ctx.routes.get('/api/memvault/state')
   const stateResponse = await stateRoute.fetch(new Request('http://x/api/memvault/state?session=s1'))
   const stateBody = await stateResponse.json()
-  eq(stateBody.acl?.identity, 'dsh', 'state route returns the session ACL')
+  eq(stateBody.acl?.scope, 'buckets', 'state route returns the session ACL')
 
   const sessionRoute = host.ctx.routes.get('/api/memvault/session')
   const clearResponse = await sessionRoute.fetch(new Request('http://x/api/memvault/session', {
@@ -236,12 +237,50 @@ const stateFile = join(dataDir, 'dsh-state.json')
   eq(cleared.acl, null, 'clearing the ACL through the API')
   eq(host.ctx.restrictions.length, 1, 'no new restriction after clearing')
 
-  // Re-bind with the agent's own bucket, read-write.
-  await host.ctx.services.memvault.setSessionAcl('s1', { identity: 'dsh', bucket: null, mode: 'write' })
+  // A legacy single-identity binding is read as one bucket entry.
+  const legacy = await host.ctx.services.memvault.setSessionAcl('s1', { identity: 'dsh', bucket: null, mode: 'write' })
+  eq(legacy.acl?.scope, 'buckets', 'legacy binding migrates to the bucket scope')
+  eq(legacy.acl?.buckets?.[0]?.bucket, null, 'legacy default bucket kept')
   const guard2 = host.ctx.guardFns.at(-1).fn
   ok(guard2({ name: 'mcp__memvault__memvault_search', arguments: {} }) === undefined, 'omitted bucket allowed for the default bucket')
-  ok(guard2({ name: 'mcp__memvault__memvault_search', arguments: { bucket: 'b'.repeat(64) } })?.includes('default bucket'), 'explicit bucket denied for the default-bucket binding')
+  ok(guard2({ name: 'mcp__memvault__memvault_search', arguments: { bucket: 'b'.repeat(64) } })?.includes('not available'), 'explicit bucket denied for the default-bucket binding')
   ok(guard2({ name: 'mcp__memvault__memvault_put', arguments: {} }) === undefined, 'write allowed in read-write mode')
+
+  // --- identities scope ------------------------------------------------------
+  const scopedIdentities = await host.ctx.services.memvault.setSessionAcl('s1', {
+    scope: 'identities',
+    mode: 'write',
+    identities: ['dsh'],
+  })
+  eq(scopedIdentities.acl?.identities?.[0], 'dsh', 'identity scope stores the selection')
+  const guard3 = host.ctx.guardFns.at(-1).fn
+  ok(guard3({ name: 'mcp__memvault__memvault_search', arguments: { bucket: 'b'.repeat(64) } }) === undefined, 'identities scope allows every bucket of the selected identity')
+  ok(guard3({ name: 'mcp__memvault__memvault_put', arguments: {} }) === undefined, 'identities scope keeps writes in read-write mode')
+
+  // --- all scope, read-only --------------------------------------------------
+  const allScope = await host.ctx.services.memvault.setSessionAcl('s1', { scope: 'all', mode: 'read' })
+  eq(allScope.acl?.scope, 'all', 'all scope stored')
+  const guard4 = host.ctx.guardFns.at(-1).fn
+  ok(guard4({ name: 'mcp__memvault__memvault_put', arguments: {} })?.includes('read-only'), 'all scope still enforces read-only')
+  ok(guard4({ name: 'mcp__memvault__memvault_search', arguments: { bucket: 'c'.repeat(64) } }) === undefined, 'all scope allows any bucket')
+  ok(guard4({ name: 'mcp__memvault_work__memvault_search', arguments: {} }) === undefined, 'all scope allows other identities')
+
+  // --- scope validation ------------------------------------------------------
+  let scopeError
+  try {
+    await host.ctx.services.memvault.setSessionAcl('s1', { scope: 'identities', mode: 'read', identities: [] })
+  } catch (failure) { scopeError = String(failure.message) }
+  ok(scopeError?.includes('at least one identity'), 'empty identity selection rejected')
+  scopeError = undefined
+  try {
+    await host.ctx.services.memvault.setSessionAcl('s1', { scope: 'buckets', mode: 'read', buckets: [] })
+  } catch (failure) { scopeError = String(failure.message) }
+  ok(scopeError?.includes('at least one bucket'), 'empty bucket selection rejected')
+  scopeError = undefined
+  try {
+    await host.ctx.services.memvault.setSessionAcl('s1', { scope: 'identities', mode: 'read', identities: ['nope'] })
+  } catch (failure) { scopeError = String(failure.message) }
+  ok(scopeError?.includes('unknown identity'), 'unknown identity in a selection rejected')
 
   // --- check + buckets through the tools registry --------------------------
   const check = await host.ctx.services.memvault.check('dsh')
@@ -254,7 +293,8 @@ const stateFile = join(dataDir, 'dsh-state.json')
 
   // --- persistence ----------------------------------------------------------
   const saved = JSON.parse(await readFile(stateFile, 'utf8'))
-  eq(saved.sessions.s1?.mode, 'write', 'ACL persisted')
+  eq(saved.sessions.s1?.scope, 'all', 'ACL scope persisted')
+  eq(saved.sessions.s1?.mode, 'read', 'ACL mode persisted')
   eq(saved.identities.length, 1, 'identity persisted')
 }
 
@@ -265,7 +305,8 @@ const stateFile = join(dataDir, 'dsh-state.json')
   await waitFor(() => host.ctx.services.memvault !== undefined, 'service provided after restart')
   await waitFor(() => host.ctx.services.memvault.snapshot('s1').identities.length === 1, 'state restored after restart')
   const restored = host.ctx.services.memvault.snapshot('s1')
-  eq(restored.acl?.mode, 'write', 'ACL restored from disk')
+  eq(restored.acl?.scope, 'all', 'ACL scope restored from disk')
+  eq(restored.acl?.mode, 'read', 'ACL mode restored from disk')
   host.addAgent('s1')
   host.ctx.emit('agent/created', { agent: host.ctx.agentList[0] })
   await waitFor(() => host.ctx.guardFns.length === 1, 'restored ACL applied to the agent')
@@ -296,9 +337,30 @@ const stateFile = join(dataDir, 'dsh-state.json')
   ok(guard({ name: 'mcp__memvault_work__memvault_search', arguments: {} })?.includes('other memvault identities'), 'calls to the other identity denied')
   ok(guard({ name: 'mcp__memvault__memvault_put', arguments: {} }) === undefined, 'own identity writes allowed')
 
+  // The identities scope selects namespaces, not buckets.
+  await host.ctx.services.memvault.setSessionAcl('s2', {
+    scope: 'identities',
+    mode: 'write',
+    identities: ['dsh'],
+  })
+  const scopedGuard = host.ctx.guardFns.at(-1).fn
+  ok(scopedGuard({ name: 'mcp__memvault_work__memvault_search', arguments: {} })?.includes('other memvault identities'), 'identities scope hides the unselected identity')
+  ok(scopedGuard({ name: 'mcp__memvault__memvault_search', arguments: { bucket: 'f'.repeat(64) } }) === undefined, 'identities scope allows any bucket of the selected identity')
+
+  await host.ctx.services.memvault.setSessionAcl('s2', {
+    scope: 'buckets',
+    mode: 'write',
+    buckets: [{ identity: 'dsh', bucket: 'f'.repeat(64) }],
+  })
+  const bucketGuard = host.ctx.guardFns.at(-1).fn
+  ok(bucketGuard({ name: 'mcp__memvault__memvault_search', arguments: { bucket: 'f'.repeat(64) } }) === undefined, 'bucket scope allows the selected bucket')
+  ok(bucketGuard({ name: 'mcp__memvault__memvault_search', arguments: { bucket: 'a'.repeat(64) } })?.includes('not available'), 'bucket scope denies another bucket')
+  ok(bucketGuard({ name: 'mcp__memvault_work__memvault_search', arguments: {} })?.includes('other memvault identities'), 'bucket scope hides identities with no selected bucket')
+
+  const restrictionsBefore = host.ctx.restrictions.length
   host.ctx.emit('tools/change')
   await new Promise((done) => setTimeout(done, 50))
-  eq(host.ctx.restrictions.length, 1, 'tools/change does not loop or duplicate the restriction')
+  eq(host.ctx.restrictions.length, restrictionsBefore, 'tools/change does not loop or duplicate the restriction')
 }
 
 // --- redeeming a new identity ----------------------------------------------
@@ -351,7 +413,7 @@ await writeFile(join(dir, 'private_key.pem'), 'stub\\n')
 
   // --- removing the identity -------------------------------------------------
   await host.ctx.services.memvault.setSessionAcl('s3', { identity: 'work', bucket: null, mode: 'read' })
-  eq(host.ctx.services.memvault.snapshot('s3').acl?.identity, 'work', 'session bound to the new identity')
+  eq(host.ctx.services.memvault.snapshot('s3').acl?.buckets?.[0]?.identity, 'work', 'session bound to the new identity')
   const removed = await host.ctx.services.memvault.remove('work', { deleteCredential: true })
   eq(removed.identities.length, 1, 'identity record removed')
   eq(removed.clearedSessions, 1, 'session binding cleared')

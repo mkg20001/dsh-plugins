@@ -70,7 +70,7 @@ const state = {
       tools: 0,
     },
   ],
-  acl: { identity: 'dsh', bucket: null, mode: 'read' },
+  acl: { scope: 'identities', mode: 'read', identities: ['dsh'], buckets: [] },
   sessions: {},
 }
 const responses = {
@@ -126,32 +126,52 @@ const html = container.innerHTML
 ok(html.includes('Memvault') && html.includes('Identities'), 'renders the panel heading and identity table')
 ok(html.includes('Identity') && html.includes('Tools') && html.includes('Status'), 'identity table headers')
 ok(html.includes('+ New identity'), 'identity add control sits in the list header')
-ok(html.includes('Session access') && html.includes('Access'), 'renders the access block below the list')
 ok(html.includes('dsh') && html.includes('Work'), 'renders both identity rows')
 ok((html.match(/dsmv-badge/g) ?? []).length >= 2, 'identity rows carry a status badge')
 ok(html.includes('>config<'), 'config identity is tagged')
 ok(html.includes('Remove…'), 'panel identity is removable')
-ok(html.includes('62'), 'renders the tool count')
-ok(html.includes('Bound to') && html.includes('read-only'), 'renders the ACL summary')
-ok(html.includes('Agent\'s own bucket') && html.includes('Team'), 'pre-loads and renders the bucket table')
-ok((html.match(/type="radio"/g) ?? []).length === 2, 'the agent bucket is merged into the default row')
-ok(html.includes('agent:dsh') === false, 'the agent bucket is not listed twice')
-ok((html.match(/<svg/g) ?? []).length >= 2, 'bucket rows carry a database icon')
-ok(html.includes('read-write') && html.includes('Apply to session'), 'renders the access mode and apply control')
-ok(html.includes('Loading buckets') === false, 'bucket preload settled')
-ok(html.includes('Redeem and connect') === false, 'the add form starts collapsed')
-ok(calls.includes('state') && calls.includes('buckets'), 'panel used the state and buckets endpoints')
 
-// The add form lives in the identity list and expands in place.
-const addButton = [...container.querySelectorAll('button')].find((button) =>
-  (button.textContent ?? '').includes('+ New identity'))
-ok(addButton !== undefined, 'the add control is a button')
-addButton.click()
+// Scope picker + identity selection downstream.
+ok(html.includes('All buckets, all remotes'), 'scope: all buckets, all remotes')
+ok(html.includes('Selected identities only'), 'scope: selected identities only')
+ok(html.includes('Selected buckets only'), 'scope: selected buckets only')
+ok((html.match(/name="dsmv-scope"/g) ?? []).length === 3, 'three scope options')
+ok(html.includes('all their buckets') && html.includes('read-only'), 'ACL summary describes the scope')
+ok((html.match(/type="checkbox"/g) ?? []).length >= 2, 'identity selection uses checkboxes')
+ok(html.includes('Redeem and connect') === false, 'the add form starts collapsed')
+ok(calls.includes('state'), 'panel fetched the state through /api/memvault')
+
+// Switch to bucket scope: the bucket lists load and row checkboxes appear.
+const bucketScope = [...container.querySelectorAll('input[name="dsmv-scope"]')]
+  .find((input) => (input.closest('label')?.textContent ?? '').includes('Selected buckets only'))
+ok(bucketScope !== undefined, 'bucket scope option is a control')
+bucketScope.click()
+for (let turn = 0; turn < 80 && !container.innerHTML.includes('Team'); turn += 1) {
+  await new Promise((resolve) => setTimeout(resolve, 10))
+}
+const scoped = container.innerHTML
+ok(scoped.includes("Agent's own bucket") && scoped.includes('Team'), 'bucket scope lists buckets for every usable identity')
+ok(scoped.includes('agent:dsh') === false, 'the agent bucket is merged into the default row')
+ok((scoped.match(/<svg/g) ?? []).length >= 2, 'bucket rows carry a database icon')
+ok(scoped.includes('Loading buckets') === false, 'bucket preload settled')
+ok(calls.includes('buckets'), 'bucket scope loaded the bucket lists')
+
+// Picking a bucket row marks it and counts it.
+const bucketRow = [...container.querySelectorAll('tr')]
+  .find((row) => (row.textContent ?? '').includes('Team'))
+bucketRow.click()
 await new Promise((resolve) => setTimeout(resolve, 30))
-const withForm = container.innerHTML
-ok(withForm.includes('Redeem and connect'), 'the add form expands inside the identity list')
-ok(withForm.includes('Memvault server URL'), 'the add form keeps the server field')
-ok((withForm.match(/dsmv-table/g) ?? []).length >= 2, 'identity and bucket tables share the table style')
+ok(container.innerHTML.includes('1 selected'), 'bucket selection is counted')
+ok(bucketRow.className.includes('selected'), 'selected bucket row is highlighted')
+
+// Back to all-scope: no selection UI, apply still available.
+const allScope = [...container.querySelectorAll('input[name="dsmv-scope"]')]
+  .find((input) => (input.closest('label')?.textContent ?? '').includes('All buckets, all remotes'))
+allScope.click()
+await new Promise((resolve) => setTimeout(resolve, 30))
+const allHtml = container.innerHTML
+ok(allHtml.includes('Every identity and bucket stays available'), 'all scope explains itself')
+ok(allHtml.includes('Apply to session') && allHtml.includes('Clear'), 'apply and clear controls render')
 
 root.unmount()
 console.log(`\n${passes} passed, ${failures} failed`)

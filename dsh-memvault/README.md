@@ -47,15 +47,20 @@ selects it, which scopes the table below. **+ New identity** sits in the
 section header and expands the add form (agent id, memvault server URL,
 provisioning token) right under the table.
 
-**Session access** — the session binding for the selected identity. The bucket
-list is pre-loaded (via `memvault_bucket_list`) into a table with a database
-icon per row, the item count, and a single-choice picker; the identity's own
-agent bucket is shown once as *Agent's own bucket* (no `bucket` argument). An
-access segmented control switches read-only / read-write, and **Apply to
-session** / **Clear** write the binding. A small ↻ button reloads the bucket
-list.
+**Session access** — a scope picker with three modes:
 
-State polling is every 3 s.
+- **All buckets, all remotes** — every identity and bucket stays reachable.
+- **Selected identities only** — a checkbox per identity; every bucket those
+  identities own is allowed.
+- **Selected buckets only** — a checkbox table of buckets across all usable
+  identities (database icon, name, identity, item count); each identity's own
+  agent bucket appears as *Agent's own bucket* (no `bucket` argument), and
+  the lists load as the mode is picked (↻ reloads them).
+
+An access segmented control switches read-only / read-write for whichever
+scope is chosen, then **Apply to session** / **Clear** write or drop the
+binding. Without a binding the panel shows *no local ACL*; an applied binding
+is summarised as `applied: …`. State polling is every 3 s.
 
 ![The Memvault tab: identity table above, session access below](preview.png)
 
@@ -81,7 +86,7 @@ Connection's owner peer and origin fence). Routes: `state`, `redeem`, `enabled`,
 | `token` | env `MEMVAULT_TOKEN`, then `MEMVAULT_JOIN_TOKEN` | Provisioning token redeemed at activation |
 | `identityDir` | `<dataDir>/agents/<agentId>` | Must end in `<agentId>` — memvault derives the agent name from the basename |
 | `dataDir` | platform data dir (env `MEMVAULT_DATA_DIR`) | Base for identity dirs and the state file |
-| `stateFile` | `<dataDir>/dsh-state.json` | Identity records + per-session ACLs (0600, atomic writes) |
+| `stateFile` | `<dataDir>/dsh-state.json` | Identity records + per-session ACLs (0600, atomic writes); ACLs are stored as `{ scope: 'all' \| 'identities' \| 'buckets', mode, identities, buckets }` and the old single-identity shape is migrated on load |
 | `serverName` | `memvault` | Namespace of the first identity |
 | `command` | `memvault-mcp` (env `MEMVAULT_MCP_BIN`) | The Rust MCP server binary |
 | `defaultTags` | `[]` | `scope:label` tags applied to writes that omit tags |
@@ -113,9 +118,15 @@ need a new token).
   (`bucket: "<hex>"`) — which the prompt section asks for — and the guard
   denies anything else, including omitting the bucket when one is bound. Tools
   that take no `bucket` still use the identity's own agent bucket server-side.
+- **Scopes.** `all` leaves every identity/bucket reachable (an `all` binding
+  is stored only to pin read-only; `all` + read-write clears the binding).
+  `identities` hides every identity outside the selection and allows all of
+  the selected ones' buckets. `buckets` allows only the listed bucket ids (or
+  the identity's default bucket when an entry has `bucket: null`), and hides
+  identities that contribute no selected bucket.
 - **Read-only** hides and denies everything not in the read allowlist
   (`memvault_get`, `search`, `list`, `status`, bucket/skill/VFS listings,
-  export, audit, …).
+  export, audit, …) inside the scope.
 - **Isolation is per live agent.** Tools are registered globally by the MCP
   client, then masked per agent. A later connection finishing changes the
   visible set; the plugin re-applies bindings on `tools/change` (deduplicated

@@ -116,6 +116,9 @@ window.__ModuleLoader__.load({
         color: var(--dsw-alias-label-primary); }
       .dsmv-empty { padding: 18px 12px; text-align: center; color: var(--dsw-alias-label-secondary); }
       .dsmv-form { display: flex; flex-direction: column; gap: 8px; }
+      .dsmv-scope { display: flex; gap: 8px; align-items: flex-start; padding: 3px 0; cursor: pointer; }
+      .dsmv-scope input { margin-top: 3px; }
+      .dsmv-selectblock { display: flex; flex-direction: column; gap: 8px; }
     `
 
 
@@ -342,14 +345,29 @@ window.__ModuleLoader__.load({
       )
     }
 
-    /** The moving parts of the panel: identity table, then the session access table. */
+    /** Checkbox cell for a selection table. */
+    function PickCell({ checked, label, onToggle }) {
+      return h('td', { className: 'pick' },
+        h('input', {
+          type: 'checkbox',
+          checked,
+          'aria-label': label,
+          onChange: onToggle,
+          onClick: (event) => event.stopPropagation(),
+        }),
+      )
+    }
+
+    /** The moving parts of the panel: identity table, then the session access scope. */
     function MemvaultPanel({ sessionId }) {
       const [state, setState] = React.useState(null)
       const [error, setError] = React.useState(null)
       const [busy, setBusy] = React.useState(false)
       const [identity, setIdentity] = React.useState('')
-      const [bucket, setBucket] = React.useState('')
+      const [scope, setScope] = React.useState('all')
       const [mode, setMode] = React.useState('write')
+      const [selectedIdentities, setSelectedIdentities] = React.useState([])
+      const [selectedBuckets, setSelectedBuckets] = React.useState([])
       const [bucketCache, setBucketCache] = React.useState({})
       const [addOpen, setAddOpen] = React.useState(false)
       const [newAgent, setNewAgent] = React.useState('')
@@ -357,17 +375,10 @@ window.__ModuleLoader__.load({
       const [newToken, setNewToken] = React.useState('')
 
       const acl = state?.acl ?? null
+      const aclKey = JSON.stringify(acl)
       const ids = state?.identities ?? []
-      const selected = ids.find((item) => item.id === identity) ?? null
-      const buckets = bucketCache[identity] ?? { loading: false, items: null, error: null }
+      const selectedIdentity = ids.find((item) => item.id === identity) ?? null
       const defaultServer = ids[0]?.server ?? 'http://127.0.0.1:8401'
-      // The identity's agent bucket is the same thing as "no bucket argument";
-      // it is shown once, as the default row.
-      const ownBucketId = (buckets.items ?? []).find(
-        (item) => selected !== null && item.name === `agent:${selected.agentId}`,
-      )?.id
-      const defaultSelected = bucket === '' || (ownBucketId !== undefined && bucket === ownBucketId)
-      const visibleBuckets = (buckets.items ?? []).filter((item) => item.id !== ownBucketId)
 
       const refresh = React.useCallback(async () => {
         try {
@@ -385,20 +396,27 @@ window.__ModuleLoader__.load({
         return () => clearInterval(timer)
       }, [refresh])
 
-      // With no binding, start on a usable identity so the access table pre-loads.
+      // With no binding, start on a usable identity so the actions have a target.
       React.useEffect(() => {
         if (identity !== '' || ids.length === 0) return
         const usable = ids.find((item) => item.status === 'connected') ?? ids[0]
         setIdentity(usable.id)
       }, [identity, ids])
 
-      // Follow a binding when it changes (it may have been set elsewhere).
+      // Follow a stored binding when it changes (it may have been set elsewhere).
       React.useEffect(() => {
-        if (acl === null || acl === undefined) return
-        setIdentity(acl.identity)
-        setBucket(acl.bucket ?? '')
-        setMode(acl.mode)
-      }, [acl?.identity, acl?.bucket, acl?.mode])
+        if (acl === null) {
+          setScope('all')
+          setMode('write')
+          setSelectedIdentities([])
+          setSelectedBuckets([])
+          return
+        }
+        setScope(acl.scope ?? 'all')
+        setMode(acl.mode === 'read' ? 'read' : 'write')
+        setSelectedIdentities(Array.isArray(acl.identities) ? acl.identities : [])
+        setSelectedBuckets(Array.isArray(acl.buckets) ? acl.buckets : [])
+      }, [aclKey])
 
       const loadBuckets = React.useCallback(async (id, force = false) => {
         if (id === '') return
@@ -420,11 +438,14 @@ window.__ModuleLoader__.load({
         }
       }, [])
 
-      // Pre-load the bucket list as soon as an identity is selected.
+      // Bucket selection needs every usable identity's list.
       React.useEffect(() => {
-        if (identity === '') return
-        void loadBuckets(identity)
-      }, [identity, loadBuckets])
+        if (scope !== 'buckets') return
+        for (const item of ids) {
+          if (item.tools === 0 && item.status !== 'connected' && item.status !== 'pending') continue
+          void loadBuckets(item.id)
+        }
+      }, [scope, ids, loadBuckets])
 
       const change = async (task) => {
         setBusy(true)
@@ -439,44 +460,178 @@ window.__ModuleLoader__.load({
         }
       }
 
-      const applyAcl = () =>
+      const toggleIdentity = (id) =>
+        setSelectedIdentities((previous) =>
+          previous.includes(id) ? previous.filter((item) => item !== id) : [...previous, id])
+
+      const toggleBucket = (identityId, bucketId) =>
+        setSelectedBuckets((previous) => {
+          const exists = previous.some((entry) => entry.identity === identityId && entry.bucket === bucketId)
+          if (exists) {
+            return previous.filter((entry) => !(entry.identity === identityId && entry.bucket === bucketId))
+          }
+          return [...previous, { identity: identityId, bucket: bucketId }]
+        })
+
+      const chooseScope = (value) => {
+        setScope(value)
+        if (value === 'identities' && selectedIdentities.length === 0 && identity !== '') {
+          setSelectedIdentities([identity])
+        }
+      }
+
+      const apply = () =>
         change(async () => {
-          if (identity === '') throw new Error('Choose an identity first.')
+          if (scope === 'all') {
+            await api('session', {
+              sessionId,
+              acl: mode === 'write' ? null : { scope: 'all', mode },
+            })
+            return
+          }
+          if (scope === 'identities') {
+            if (selectedIdentities.length === 0) throw new Error('Select at least one identity.')
+            await api('session', {
+              sessionId,
+              acl: { scope: 'identities', mode, identities: selectedIdentities },
+            })
+            return
+          }
+          if (selectedBuckets.length === 0) throw new Error('Select at least one bucket.')
           await api('session', {
             sessionId,
-            acl: { identity, bucket: defaultSelected ? null : bucket, mode },
+            acl: { scope: 'buckets', mode, buckets: selectedBuckets },
           })
         })
 
       const clearAcl = () => change(() => api('session', { sessionId, acl: null }))
 
-      const rowSelected = (id) => (id === '' ? defaultSelected : !defaultSelected && bucket === id)
-      const bucketRow = (row) =>
-        h('tr', {
-          key: row.id === '' ? 'default' : row.id,
-          className: rowSelected(row.id) ? 'selected' : '',
-          onClick: () => setBucket(row.id),
-        },
-          h('td', null,
-            h('div', { className: 'dsmv-cell' },
-              h(DbIcon, null),
-              h('div', { className: 'dsmv-celltext' },
-                h('div', { className: 'dsmv-cellname' }, row.name),
-                h('div', { className: 'dsmv-cellid' }, row.id === '' ? row.sub : shortId(row.id)),
-              ),
-            ),
-          ),
-          h('td', { className: 'num' }, row.items === null || row.items === undefined ? '—' : String(row.items)),
-          h('td', { className: 'pick' },
-            h('input', {
-              type: 'radio',
-              name: 'dsmv-bucket',
-              checked: rowSelected(row.id),
-              'aria-label': `Use ${row.name}`,
-              onChange: () => setBucket(row.id),
-            }),
+      const labelOf = (id) => ids.find((item) => item.id === id)?.label ?? id
+      const describeAcl = () => {
+        if (acl === null) return 'No local ACL — every identity and bucket is available.'
+        const access = acl.mode === 'read' ? 'read-only' : 'read-write'
+        if (acl.scope === 'all') return `All buckets, all identities · ${access}`
+        if (acl.scope === 'identities') {
+          return `${(acl.identities ?? []).map(labelOf).join(', ')} · all their buckets · ${access}`
+        }
+        return `${(acl.buckets ?? []).length} bucket(s) · ${access}`
+      }
+
+      const scopeOption = (value, label, hint) =>
+        h('label', { className: 'dsmv-scope' },
+          h('input', {
+            type: 'radio',
+            name: 'dsmv-scope',
+            checked: scope === value,
+            onChange: () => chooseScope(value),
+          }),
+          h('div', { className: 'dsmv-celltext' },
+            h('div', null, label),
+            h('div', { className: 'dsmv-note' }, hint),
           ),
         )
+
+      const identitySelection = h('div', { className: 'dsmv-tablewrap' },
+        h('table', { className: 'dsmv-table' },
+          h('thead', null, h('tr', null,
+            h('th', { className: 'pick' }, ''),
+            h('th', null, 'Identity'),
+            h('th', { className: 'num' }, 'Tools'),
+            h('th', { className: 'nowrap' }, 'Status'),
+          )),
+          h('tbody', null, ids.map((item) => {
+            const checked = selectedIdentities.includes(item.id)
+            return h('tr', {
+              key: item.id,
+              className: checked ? 'selected' : '',
+              onClick: () => toggleIdentity(item.id),
+            },
+              h(PickCell, {
+                checked,
+                label: `Include ${item.label}`,
+                onToggle: () => toggleIdentity(item.id),
+              }),
+              h('td', null,
+                h('div', { className: 'dsmv-cell' },
+                  h('span', { className: `dsmv-dot ${item.status}`, title: item.status }),
+                  h('div', { className: 'dsmv-celltext' },
+                    h('div', { className: 'dsmv-cellname' }, item.label),
+                    h('div', { className: 'dsmv-cellid' }, `${item.agentId} · ${item.serverName}`),
+                  ),
+                ),
+              ),
+              h('td', { className: 'num' }, String(item.tools)),
+              h('td', { className: 'nowrap' }, h('span', { className: 'dsmv-badge' }, item.status)),
+            )
+          })),
+        ),
+      )
+
+      const bucketSelectionRows = []
+      for (const item of ids) {
+        if (item.tools === 0 && item.status !== 'connected' && item.status !== 'pending') continue
+        const cache = bucketCache[item.id]
+        const ownBucketId = (cache?.items ?? []).find(
+          (bucket) => bucket.name === `agent:${item.agentId}`,
+        )?.id
+        const row = (bucketId, name, sub, items) => {
+          const key = `${item.id}:${bucketId ?? ''}`
+          const checked = selectedBuckets.some(
+            (entry) => entry.identity === item.id && entry.bucket === bucketId,
+          )
+          return h('tr', {
+            key,
+            className: checked ? 'selected' : '',
+            onClick: () => toggleBucket(item.id, bucketId),
+          },
+            h(PickCell, {
+              checked,
+              label: `Include ${name} on ${item.label}`,
+              onToggle: () => toggleBucket(item.id, bucketId),
+            }),
+            h('td', null,
+              h('div', { className: 'dsmv-cell' },
+                h(DbIcon, null),
+                h('div', { className: 'dsmv-celltext' },
+                  h('div', { className: 'dsmv-cellname' }, name),
+                  h('div', { className: 'dsmv-cellid' }, bucketId === null ? sub : shortId(bucketId)),
+                ),
+              ),
+            ),
+            h('td', { className: 'nowrap' }, item.label),
+            h('td', { className: 'num' }, items === null || items === undefined ? '—' : String(items)),
+          )
+        }
+        bucketSelectionRows.push(row(null, "Agent's own bucket", `${item.agentId} · no bucket argument`, null))
+        if (cache === undefined || cache.loading) {
+          bucketSelectionRows.push(h('tr', { key: `${item.id}:loading` },
+            h('td', { colSpan: 4, className: 'dsmv-empty' }, `Loading buckets for ${item.label}…`)))
+        } else if (cache.error !== null && cache.error !== undefined) {
+          bucketSelectionRows.push(h('tr', { key: `${item.id}:error` },
+            h('td', { colSpan: 4, className: 'dsmv-empty dsmv-error' }, `${item.label}: ${cache.error}`)))
+        } else {
+          for (const bucket of cache.items.filter((entry) => entry.id !== ownBucketId)) {
+            bucketSelectionRows.push(row(bucket.id, bucket.name, '', bucket.items))
+          }
+        }
+      }
+
+      const bucketSelection = h('div', { className: 'dsmv-tablewrap' },
+        h('table', { className: 'dsmv-table' },
+          h('thead', null, h('tr', null,
+            h('th', { className: 'pick' }, ''),
+            h('th', null, 'Bucket'),
+            h('th', { className: 'nowrap' }, 'Identity'),
+            h('th', { className: 'num' }, 'Items'),
+          )),
+          h('tbody', null,
+            bucketSelectionRows.length === 0
+              ? h('tr', null, h('td', { colSpan: 4, className: 'dsmv-empty' },
+                  'No connected identity with buckets — start one, then reload.'))
+              : bucketSelectionRows,
+          ),
+        ),
+      )
 
       const addForm = h('div', { className: 'dsmv-addform' },
         h('div', { className: 'dsmv-form' },
@@ -522,7 +677,6 @@ window.__ModuleLoader__.load({
                   setNewToken('')
                   setAddOpen(false)
                   setIdentity(added)
-                  setBucket('')
                 }),
             }, 'Redeem and connect'),
             h('button', {
@@ -538,71 +692,82 @@ window.__ModuleLoader__.load({
         h('div', { className: 'dsmv-blockhead' },
           h('h3', null, 'Session access'),
           h('div', { className: 'dsmv-grow' }),
-          selected === null ? null : h('span', { className: 'dsmv-note' }, `identity: ${selected.label}`),
+          h('span', { className: 'dsmv-note' },
+            acl === null ? describeAcl() : `applied: ${describeAcl()}`),
         ),
-        selected === null
-          ? h('div', { className: 'dsmv-tablewrap' },
-              h('div', { className: 'dsmv-empty' }, 'Select an identity above to manage this session’s access.'))
-          : h(React.Fragment, null,
-              h('div', { className: 'dsmv-note' },
-                acl === null
-                  ? 'No local ACL — every identity and bucket is available to this session.'
-                  : `Bound to ${acl.identity}, ` +
-                    `${acl.bucket === null ? 'agent default bucket' : shortId(acl.bucket)}, ` +
-                    `${acl.mode === 'read' ? 'read-only' : 'read-write'}.`),
-              h('div', { className: 'dsmv-tablewrap' },
-                h('table', { className: 'dsmv-table' },
-                  h('thead', null, h('tr', null,
-                    h('th', null, 'Bucket'),
-                    h('th', { className: 'num' }, 'Items'),
-                    h('th', { className: 'pick' }, 'Use'),
-                  )),
-                  h('tbody', null,
-                    bucketRow({ id: '', name: "Agent's own bucket", sub: `${selected.agentId} · default`, items: null }),
-                    ...(buckets.loading
-                      ? [h('tr', { key: 'loading' }, h('td', { colSpan: 3, className: 'dsmv-empty' }, 'Loading buckets…'))]
-                      : buckets.error !== null && buckets.error !== undefined
-                        ? [h('tr', { key: 'error' }, h('td', { colSpan: 3, className: 'dsmv-empty dsmv-error' }, buckets.error))]
-                        : visibleBuckets.map((item) =>
-                            bucketRow({ id: item.id, name: item.name, sub: '', items: item.items }))),
-                  ),
-                ),
+        h('div', { className: 'dsmv-selectblock' },
+          h('div', { className: 'dsmv-label' }, 'Scope'),
+          scopeOption('all', 'All buckets, all remotes', 'Everything this agent can reach, with the access below.'),
+          scopeOption('identities', 'Selected identities only', 'Only the chosen identities; every bucket they own.'),
+          scopeOption('buckets', 'Selected buckets only', 'Only the chosen buckets, across identities.'),
+        ),
+        scope === 'identities'
+          ? h(React.Fragment, null,
+              h('div', { className: 'dsmv-row' },
+                h('div', { className: 'dsmv-label' }, 'Identities'),
+                h('div', { className: 'dsmv-grow' }),
+                h('button', {
+                  type: 'button',
+                  className: 'dsmv-mini',
+                  onClick: () => setSelectedIdentities(ids.map((item) => item.id)),
+                }, 'All'),
+                h('button', {
+                  type: 'button',
+                  className: 'dsmv-mini',
+                  onClick: () => setSelectedIdentities([]),
+                }, 'None'),
               ),
-              h('div', { className: 'dsmv-controls' },
+              identitySelection,
+            )
+          : scope === 'buckets'
+            ? h(React.Fragment, null,
                 h('div', { className: 'dsmv-row' },
-                  h('div', { className: 'dsmv-label' }, 'Access'),
-                  h('div', { className: 'dsmv-seg', role: 'group', 'aria-label': 'Access mode' },
-                    h('button', {
-                      type: 'button',
-                      className: `dsmv-segbtn${mode === 'read' ? ' active' : ''}`,
-                      'aria-pressed': mode === 'read',
-                      onClick: () => setMode('read'),
-                    }, 'read-only'),
-                    h('button', {
-                      type: 'button',
-                      className: `dsmv-segbtn${mode === 'write' ? ' active' : ''}`,
-                      'aria-pressed': mode === 'write',
-                      onClick: () => setMode('write'),
-                    }, 'read-write'),
-                  ),
+                  h('div', { className: 'dsmv-label' }, 'Buckets'),
+                  h('div', { className: 'dsmv-grow' }),
+                  h('span', { className: 'dsmv-note' }, `${selectedBuckets.length} selected`),
                   h('button', {
                     type: 'button',
-                    className: 'dsmv-iconbtn',
-                    title: 'Reload buckets',
-                    'aria-label': 'Reload buckets',
-                    disabled: buckets.loading,
-                    onClick: () => loadBuckets(identity, true),
+                    className: 'dsmv-mini',
+                    onClick: () => {
+                      for (const item of ids) void loadBuckets(item.id, true)
+                    },
                   }, '↻'),
+                  h('button', {
+                    type: 'button',
+                    className: 'dsmv-mini',
+                    onClick: () => setSelectedBuckets([]),
+                  }, 'None'),
                 ),
-                h('div', { className: 'dsmv-actions' },
-                  h('button', { type: 'button', className: 'primary', disabled: busy, onClick: applyAcl }, 'Apply to session'),
-                  h('button', { type: 'button', disabled: busy || acl === null, onClick: clearAcl }, 'Clear'),
-                ),
-              ),
-              h('div', { className: 'dsmv-note' },
-                'Enforced locally: the other identities’ tools are hidden, write tools are hidden in read-only mode, ' +
-                'and calls naming another bucket are denied.'),
+                bucketSelection,
+              )
+            : h('div', { className: 'dsmv-note' },
+                'Every identity and bucket stays available; the access mode below still applies.'),
+        h('div', { className: 'dsmv-controls' },
+          h('div', { className: 'dsmv-row' },
+            h('div', { className: 'dsmv-label' }, 'Access'),
+            h('div', { className: 'dsmv-seg', role: 'group', 'aria-label': 'Access mode' },
+              h('button', {
+                type: 'button',
+                className: `dsmv-segbtn${mode === 'read' ? ' active' : ''}`,
+                'aria-pressed': mode === 'read',
+                onClick: () => setMode('read'),
+              }, 'read-only'),
+              h('button', {
+                type: 'button',
+                className: `dsmv-segbtn${mode === 'write' ? ' active' : ''}`,
+                'aria-pressed': mode === 'write',
+                onClick: () => setMode('write'),
+              }, 'read-write'),
             ),
+          ),
+          h('div', { className: 'dsmv-actions' },
+            h('button', { type: 'button', className: 'primary', disabled: busy, onClick: apply }, 'Apply to session'),
+            h('button', { type: 'button', disabled: busy || acl === null, onClick: clearAcl }, 'Clear'),
+          ),
+        ),
+        h('div', { className: 'dsmv-note' },
+          'Enforced locally: tools outside the scope are hidden, write tools are hidden in read-only mode, ' +
+          'and calls outside a selected bucket are denied.'),
       )
 
       return h('div', { className: 'dsmv' },
@@ -621,7 +786,7 @@ window.__ModuleLoader__.load({
           h('div', { className: 'dsmv-blockhead' },
             h('h3', null, 'Identities'),
             h('div', { className: 'dsmv-grow' }),
-            selected === null ? null : h('span', { className: 'dsmv-note' }, `selected: ${selected.label}`),
+            selectedIdentity === null ? null : h('span', { className: 'dsmv-note' }, `selected: ${selectedIdentity.label}`),
             h('button', {
               type: 'button',
               className: 'dsmv-mini',
@@ -648,9 +813,9 @@ window.__ModuleLoader__.load({
                         onSelect: setIdentity,
                         onChange: refresh,
                         onRemoved: (id) => {
-                          if (id !== identity) return
-                          setIdentity('')
-                          setBucket('')
+                          if (id === identity) setIdentity('')
+                          setSelectedIdentities((previous) => previous.filter((entry) => entry !== id))
+                          setSelectedBuckets((previous) => previous.filter((entry) => entry.identity !== id))
                           setBucketCache((previous) => {
                             const next = { ...previous }
                             delete next[id]
