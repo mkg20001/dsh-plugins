@@ -1,0 +1,40 @@
+{
+  "name": "@local/reagent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Talks to reagent over its MCP API: reagent's tools for the agent and a Reagent tab for tasks, memory, docs, services and worktrees.",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "test/*.mjs"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  },
+  "scripts": {
+    "test": "node test/host.test.mjs && node test/client.test.mjs && node test/render.test.mjs",
+    "test:host": "node test/host.test.mjs",
+    "test:client": "node test/client.test.mjs",
+    "test:render": "node test/render.test.mjs"
+  }
+}

@@ -1,0 +1,21 @@
+# Reagent: connects to reagent's MCP API (`<url>/mcp`) and adds a Reagent tab
+# to the conversation view.
+#
+# The agent gets reagent's tools as `mcp__<serverName>__<tool>` (task_start,
+# task_list, task_transcript, memory_read, …). The token is read, in order,
+# from the token pasted in the Reagent tab (stored in stateFile), from `token`
+# below, or from REAGENT_TOKEN.
+#
+# A token is created with `reagent token add dsh` on the machine running
+# reagent; it is shown once.
+- insert:
+    - id: reagent
+      name: '@local/reagent'
+      config:
+        url: 'https://reagent.plan.ai'
+        serverName: 'reagent'
+        # token: 'rgt_…'                    # prefer REAGENT_TOKEN or the Reagent tab
+        # stateFile: '~/.local/share/dsh-reagent/state.json'
+        # toolCallTimeoutMs: 60000
+        # failOnStartupError: false          # true makes an unreachable reagent block the harness
+        # mcpClientModule: '/path/to/@deepseek-ai/dsh-mcp-client/lib/index.js'
