@@ -123,21 +123,35 @@ for (let turn = 0; turn < 80 && !container.innerHTML.includes('Team'); turn += 1
 }
 
 const html = container.innerHTML
-ok(html.includes('Memvault') && html.includes('Identities'), 'renders the panel heading and identity list')
-ok(html.includes('Access control') && html.includes('New identity'), 'renders the tab bar')
-ok(html.includes('Session access'), 'renders the access tab')
-ok(html.includes('dsh') && html.includes('Work'), 'renders both identity cards')
-ok(html.includes('62 tools'), 'renders the tool count')
-ok(html.includes('bound to') && html.includes('read-only'), 'renders the ACL summary')
-ok(html.includes('from the plugin row'), 'config identity is not removable')
+ok(html.includes('Memvault') && html.includes('Identities'), 'renders the panel heading and identity table')
+ok(html.includes('Identity') && html.includes('Tools') && html.includes('Status'), 'identity table headers')
+ok(html.includes('+ New identity'), 'identity add control sits in the list header')
+ok(html.includes('Session access') && html.includes('Access'), 'renders the access block below the list')
+ok(html.includes('dsh') && html.includes('Work'), 'renders both identity rows')
+ok((html.match(/dsmv-badge/g) ?? []).length >= 2, 'identity rows carry a status badge')
+ok(html.includes('>config<'), 'config identity is tagged')
 ok(html.includes('Remove…'), 'panel identity is removable')
+ok(html.includes('62'), 'renders the tool count')
+ok(html.includes('Bound to') && html.includes('read-only'), 'renders the ACL summary')
 ok(html.includes('Agent\'s own bucket') && html.includes('Team'), 'pre-loads and renders the bucket table')
 ok((html.match(/type="radio"/g) ?? []).length === 2, 'the agent bucket is merged into the default row')
 ok(html.includes('agent:dsh') === false, 'the agent bucket is not listed twice')
 ok((html.match(/<svg/g) ?? []).length >= 2, 'bucket rows carry a database icon')
 ok(html.includes('read-write') && html.includes('Apply to session'), 'renders the access mode and apply control')
 ok(html.includes('Loading buckets') === false, 'bucket preload settled')
+ok(html.includes('Redeem and connect') === false, 'the add form starts collapsed')
 ok(calls.includes('state') && calls.includes('buckets'), 'panel used the state and buckets endpoints')
+
+// The add form lives in the identity list and expands in place.
+const addButton = [...container.querySelectorAll('button')].find((button) =>
+  (button.textContent ?? '').includes('+ New identity'))
+ok(addButton !== undefined, 'the add control is a button')
+addButton.click()
+await new Promise((resolve) => setTimeout(resolve, 30))
+const withForm = container.innerHTML
+ok(withForm.includes('Redeem and connect'), 'the add form expands inside the identity list')
+ok(withForm.includes('Memvault server URL'), 'the add form keeps the server field')
+ok((withForm.match(/dsmv-table/g) ?? []).length >= 2, 'identity and bucket tables share the table style')
 
 root.unmount()
 console.log(`\n${passes} passed, ${failures} failed`)

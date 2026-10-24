@@ -36,23 +36,24 @@ Chat and Trajectory.
 ## Panel
 
 Open the **Memvault** tab in the conversation's view ring (next to Chat and
-Trajectory). The identity list comes first — each card shows status
-(`connected`/`pending`/`disabled`/`unconfigured`), agent id, namespace, tool
-count, **Check** (executes `memvault_status`), **Enable/Disable**, **Redeem…**
-(single-use token), and **Remove…** for panel-added identities. Selecting a
-card scopes everything below it.
+Trajectory). It is two stacked tables:
 
-Below the list are two tabs:
+**Identities** — one row per identity: a status dot, label, agent id and
+namespace, server URL, tool count, a status badge (plus a `config` tag for
+row-configured ones), and inline actions: **Check** (executes
+`memvault_status`), **Enable/Disable**, **Redeem…** (single-use token, expands
+under the row), and **Remove…** for panel-added identities. Clicking a row
+selects it, which scopes the table below. **+ New identity** sits in the
+section header and expands the add form (agent id, memvault server URL,
+provisioning token) right under the table.
 
-- **Access control** — the session binding for the selected identity. The
-  bucket list is pre-loaded (via `memvault_bucket_list`) into a table with a
-  database icon per row, the item count, and a single-choice picker; the
-  identity's own agent bucket is shown once as *Agent's own bucket* (no
-  `bucket` argument). An access segmented control switches read-only /
-  read-write, and **Apply to session** / **Clear** write the binding. A small
-  ↻ button reloads the bucket list.
-- **New identity** — agent id, memvault server URL, and provisioning token;
-  redeeming switches back to Access control with the new identity selected.
+**Session access** — the session binding for the selected identity. The bucket
+list is pre-loaded (via `memvault_bucket_list`) into a table with a database
+icon per row, the item count, and a single-choice picker; the identity's own
+agent bucket is shown once as *Agent's own bucket* (no `bucket` argument). An
+access segmented control switches read-only / read-write, and **Apply to
+session** / **Clear** write the binding. A small ↻ button reloads the bucket
+list.
 
 State polling is every 3 s.
 

@@ -64,14 +64,23 @@ window.__ModuleLoader__.load({
       .dsmv-note { color: var(--dsw-alias-label-secondary); font-size: 11px; }
       .dsmv-badge { font-size: 10px; padding: 1px 6px; border-radius: 999px;
         border: 1px solid var(--dsw-alias-border-l1); color: var(--dsw-alias-label-secondary); }
-      .dsmv-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--dsw-alias-border-l1); }
-      .dsmv button.dsmv-tab { border: none; border-radius: 0; background: transparent;
-        padding: 7px 10px; margin-bottom: -1px; color: var(--dsw-alias-label-secondary);
-        border-bottom: 2px solid transparent; }
-      .dsmv button.dsmv-tab:hover { color: var(--dsw-alias-label-primary); border-bottom-color: var(--dsw-alias-border-l2); }
-      .dsmv button.dsmv-tab.active { color: var(--dsw-alias-label-primary);
-        border-bottom-color: var(--dsw-alias-brand-primary); }
       .dsmv-panel { display: flex; flex-direction: column; gap: 12px; }
+      .dsmv-block { display: flex; flex-direction: column; gap: 8px; }
+      .dsmv-blockhead { display: flex; align-items: center; gap: 8px; }
+      .dsmv-table .nowrap { width: 1%; white-space: nowrap; }
+      .dsmv-table td.actions { text-align: right; white-space: nowrap; }
+      .dsmv-table tbody tr.dsmv-detail { cursor: default; }
+      .dsmv-table tbody tr.dsmv-detail:hover { background: var(--dsw-alias-bg-layer-1); }
+      .dsmv-table tr.dsmv-detail td { background: var(--dsw-alias-bg-layer-1); padding: 10px 12px; }
+      .dsmv button.dsmv-mini { padding: 3px 7px; font-size: 11.5px; }
+      .dsmv-tag { margin-left: 6px; font-size: 10px; padding: 0 5px; border-radius: 999px;
+        border: 1px solid var(--dsw-alias-border-l1); color: var(--dsw-alias-label-secondary); }
+      .dsmv-indent { padding-left: 18px; margin-top: 2px; }
+      .dsmv-inline { display: flex; flex-direction: column; gap: 8px; }
+      .dsmv-inline input { max-width: 420px; }
+      .dsmv-addform { border: 1px solid var(--dsw-alias-border-l1); border-radius: 10px;
+        padding: 11px; background: var(--dsw-alias-bg-base); }
+      .dsmv-addform input { max-width: 460px; }
       .dsmv-panelhead { display: flex; flex-direction: column; gap: 2px; }
       .dsmv-paneltitle { font-weight: 600; }
       .dsmv-tablewrap { border: 1px solid var(--dsw-alias-border-l1); border-radius: 10px;
@@ -133,14 +142,37 @@ window.__ModuleLoader__.load({
       return payload
     }
 
-    /** One identity card: status, check, enable toggle, redeem. */
-    function IdentityCard({ identity, selected, onSelect, onChange, onRemoved, busy }) {
-      const [redeeming, setRedeeming] = React.useState(false)
-      const [removing, setRemoving] = React.useState(false)
-      const [withKey, setWithKey] = React.useState(false)
-      const [notice, setNotice] = React.useState(null)
+    /** Compact id for a table cell. */
+    function shortId(id) {
+      return typeof id === 'string' && id.length > 20 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id
+    }
+
+    /** Database glyph drawn before one bucket row's name. */
+    function DbIcon() {
+      return h('svg', { viewBox: '0 0 24 24', width: 16, height: 16, 'aria-hidden': 'true' },
+        h('ellipse', { cx: 12, cy: 6, rx: 7, ry: 3, fill: 'none', stroke: 'currentColor', strokeWidth: 1.6 }),
+        h('path', { d: 'M5 6v12c0 1.66 3.13 3 7 3s7-1.34 7-3V6', fill: 'none', stroke: 'currentColor', strokeWidth: 1.6 }),
+        h('path', { d: 'M5 12c0 1.66 3.13 3 7 3s7-1.34 7-3', fill: 'none', stroke: 'currentColor', strokeWidth: 1.6 }),
+      )
+    }
+
+    /** Compact one-line rendering of a memvault_status payload. */
+    function describeStatus(status) {
+      if (status === null || typeof status !== 'object') return 'ok'
+      const parts = []
+      if (status.doc_count !== undefined) parts.push(`${status.doc_count} docs`)
+      if (status.block_count !== undefined) parts.push(`${status.block_count} blocks`)
+      if (status.peer_count !== undefined) parts.push(`${status.peer_count} peers`)
+      return parts.length > 0 ? parts.join(' · ') : 'ok'
+    }
+
+    /** One identity row: status, check, enable toggle, redeem, remove. */
+    function IdentityRow({ identity, selected, onSelect, onChange, onRemoved, busy }) {
+      const [mode, setMode] = React.useState(null)
       const [token, setToken] = React.useState('')
+      const [withKey, setWithKey] = React.useState(false)
       const [check, setCheck] = React.useState(null)
+      const [notice, setNotice] = React.useState(null)
       const [error, setError] = React.useState(null)
       const [working, setWorking] = React.useState(false)
 
@@ -156,114 +188,84 @@ window.__ModuleLoader__.load({
         }
       }
 
-      return h(
-        'div',
-        { className: `dsmv-identity${selected ? ' selected' : ''}` },
-        h(
-          'div',
-          { className: 'dsmv-row' },
-          h('span', { className: `dsmv-dot ${identity.status}`, title: identity.status }),
-          h(
-            'button',
-            {
-              type: 'button',
-              className: 'dsmv-grow',
-              style: { textAlign: 'left', border: 'none', background: 'transparent', padding: 0 },
-              onClick: () => onSelect(identity.id),
-              title: 'Use this identity for the session',
-            },
-            identity.label,
-          ),
-          h('span', { className: 'dsmv-badge' }, identity.status),
-        ),
-        h(
-          'div',
-          { className: 'dsmv-mono' },
-          `agent ${identity.agentId} · ${identity.serverName} · ${identity.tools} tools`,
-        ),
-        h('div', { className: 'dsmv-mono' }, identity.server),
-        error === null ? null : h('div', { className: 'dsmv-error' }, error),
-        notice === null ? null : h('div', { className: 'dsmv-note' }, notice),
-        check === null
-          ? null
-          : h(
-              'div',
-              { className: check.ok ? 'dsmv-ok' : 'dsmv-error' },
-              check.ok
-                ? `connected · ${describeStatus(check.status)}`
-                : check.error,
+      const action = (label, onClick, danger = false) =>
+        h('button', {
+          type: 'button',
+          className: `dsmv-mini${danger ? ' danger' : ''}`,
+          disabled: busy || working,
+          onClick: (event) => {
+            event.stopPropagation()
+            onClick()
+          },
+        }, label)
+
+      return h(React.Fragment, null,
+        h('tr', {
+          className: selected ? 'selected' : '',
+          onClick: () => onSelect(identity.id),
+          title: 'Use this identity for the session',
+        },
+          h('td', null,
+            h('div', { className: 'dsmv-cell' },
+              h('span', { className: `dsmv-dot ${identity.status}`, title: identity.status }),
+              h('div', { className: 'dsmv-celltext' },
+                h('div', { className: 'dsmv-cellname' }, identity.label),
+                h('div', { className: 'dsmv-cellid' }, `${identity.agentId} · ${identity.serverName}`),
+              ),
             ),
-        h(
-          'div',
-          { className: 'dsmv-row' },
-          h(
-            'button',
-            {
-              type: 'button',
-              disabled: busy || working || identity.status === 'disabled',
-              onClick: () =>
-                run(async () => {
-                  setCheck({ ok: false, error: 'checking…' })
-                  const result = await api('check', { identityId: identity.id })
-                  setCheck(result)
-                }),
-            },
-            'Check',
+            h('div', { className: 'dsmv-cellid dsmv-indent' }, identity.server),
+            error === null ? null : h('div', { className: 'dsmv-error dsmv-indent' }, error),
+            check === null
+              ? null
+              : h('div', {
+                  className: `${check.ok ? 'dsmv-ok' : 'dsmv-error'} dsmv-indent`,
+                }, check.ok ? `ok · ${describeStatus(check.status)}` : check.error),
+            notice === null ? null : h('div', { className: 'dsmv-note dsmv-indent' }, notice),
           ),
-          h(
-            'button',
-            {
-              type: 'button',
-              disabled: busy || working,
-              onClick: () =>
-                run(async () => {
-                  await api('enabled', { identityId: identity.id, enabled: identity.status === 'disabled' })
-                  setCheck(null)
-                  await onChange()
-                }),
-            },
-            identity.status === 'disabled' ? 'Enable' : 'Disable',
+          h('td', { className: 'num' }, String(identity.tools)),
+          h('td', { className: 'nowrap' },
+            h('span', { className: 'dsmv-badge' }, identity.status),
+            identity.source === 'config' ? h('span', { className: 'dsmv-tag' }, 'config') : null,
           ),
-          h(
-            'button',
-            { type: 'button', disabled: busy || working, onClick: () => setRedeeming(!redeeming) },
-            'Redeem…',
+          h('td', { className: 'actions', onClick: (event) => event.stopPropagation() },
+            action('Check', () =>
+              run(async () => {
+                setCheck({ ok: false, error: 'checking…' })
+                setCheck(await api('check', { identityId: identity.id }))
+              })),
+            action(identity.status === 'disabled' ? 'Enable' : 'Disable', () =>
+              run(async () => {
+                await api('enabled', { identityId: identity.id, enabled: identity.status === 'disabled' })
+                setCheck(null)
+                await onChange()
+              })),
+            action('Redeem…', () => {
+              setMode(mode === 'redeem' ? null : 'redeem')
+              setToken('')
+              setError(null)
+            }),
+            identity.source === 'config'
+              ? null
+              : action('Remove…', () => {
+                  setMode(mode === 'remove' ? null : 'remove')
+                  setError(null)
+                }, true),
           ),
-          identity.source === 'config'
-            ? h('span', { className: 'dsmv-note' }, 'from the plugin row')
-            : h(
-                'button',
-                {
-                  type: 'button',
-                  className: 'danger',
-                  disabled: busy || working,
-                  onClick: () => { setRemoving(true); setRedeeming(false) },
-                },
-                'Remove…',
-              ),
         ),
-        redeeming
-          ? h(
-              'div',
-              { className: 'dsmv-section' },
-              h(
-                'div',
-                { className: 'dsmv-label' },
-                'Provisioning token (mvjoin1:…) — single use, never stored',
-              ),
-              h('input', {
-                type: 'password',
-                value: token,
-                placeholder: 'mvjoin1:…',
-                autoComplete: 'off',
-                onChange: (event) => setToken(event.target.value),
-              }),
-              h(
-                'div',
-                { className: 'dsmv-row' },
-                h(
-                  'button',
-                  {
+        mode === 'redeem'
+          ? h('tr', { className: 'dsmv-detail' }, h('td', { colSpan: 4 },
+              h('div', { className: 'dsmv-inline' },
+                h('div', { className: 'dsmv-label' },
+                  'Provisioning token (mvjoin1:…) — single use, never stored'),
+                h('input', {
+                  type: 'password',
+                  value: token,
+                  placeholder: 'mvjoin1:…',
+                  autoComplete: 'off',
+                  onChange: (event) => setToken(event.target.value),
+                }),
+                h('div', { className: 'dsmv-row' },
+                  h('button', {
                     type: 'button',
                     className: 'primary',
                     disabled: working || token.trim() === '',
@@ -271,45 +273,41 @@ window.__ModuleLoader__.load({
                       run(async () => {
                         await api('redeem', { identityId: identity.id, token: token.trim() })
                         setToken('')
-                        setRedeeming(false)
+                        setMode(null)
                         setCheck(null)
                         await onChange()
                       }),
-                  },
-                  'Redeem token',
-                ),
-                h(
-                  'button',
-                  { type: 'button', onClick: () => { setRedeeming(false); setToken('') } },
-                  'Cancel',
+                  }, 'Redeem token'),
+                  h('button', {
+                    type: 'button',
+                    disabled: working,
+                    onClick: () => {
+                      setMode(null)
+                      setToken('')
+                    },
+                  }, 'Cancel'),
                 ),
               ),
-            )
+            ))
           : null,
-        removing
-          ? h(
-              'div',
-              { className: 'dsmv-section' },
-              h('div', { className: 'dsmv-label' }, `Remove identity "${identity.label}"?`),
-              h('div', { className: 'dsmv-note' },
-                'The identity record, its connection, and any session bindings to it are removed. ' +
+        mode === 'remove'
+          ? h('tr', { className: 'dsmv-detail' }, h('td', { colSpan: 4 },
+              h('div', { className: 'dsmv-inline' },
+                h('div', { className: 'dsmv-label' }, `Remove identity "${identity.label}"?`),
+                h('div', { className: 'dsmv-note' },
+                  'The identity record, its connection, and any session bindings to it are removed. ' +
                   'Its agent id can be added again with a new token.'),
-              h(
-                'label',
-                { className: 'dsmv-row' },
-                h('input', {
-                  type: 'checkbox',
-                  checked: withKey,
-                  onChange: (event) => setWithKey(event.target.checked),
-                }),
-                h('span', { className: 'dsmv-note' }, `also delete the private key at ${identity.identityDir}`),
-              ),
-              h(
-                'div',
-                { className: 'dsmv-row' },
-                h(
-                  'button',
-                  {
+                h('label', { className: 'dsmv-row' },
+                  h('input', {
+                    type: 'checkbox',
+                    checked: withKey,
+                    onChange: (event) => setWithKey(event.target.checked),
+                  }),
+                  h('span', { className: 'dsmv-note' },
+                    `also delete the private key at ${identity.identityDir}`),
+                ),
+                h('div', { className: 'dsmv-row' },
+                  h('button', {
                     type: 'button',
                     className: 'danger',
                     disabled: working,
@@ -319,57 +317,41 @@ window.__ModuleLoader__.load({
                           identityId: identity.id,
                           deleteCredential: withKey,
                         })
-                        setRemoving(false)
+                        setMode(null)
                         setWithKey(false)
                         if (result.warning !== undefined) setNotice(result.warning)
-                        else if (result.clearedSessions > 0) setNotice(`cleared ${result.clearedSessions} session binding(s)`)
+                        else if (result.clearedSessions > 0) {
+                          setNotice(`cleared ${result.clearedSessions} session binding(s)`)
+                        }
                         onRemoved?.(identity.id)
                         await onChange()
                       }),
-                  },
-                  'Delete identity',
+                  }, 'Delete identity'),
+                  h('button', {
+                    type: 'button',
+                    disabled: working,
+                    onClick: () => {
+                      setMode(null)
+                      setWithKey(false)
+                    },
+                  }, 'Cancel'),
                 ),
-                h('button', { type: 'button', onClick: () => { setRemoving(false); setWithKey(false) } }, 'Cancel'),
               ),
-            )
+            ))
           : null,
       )
     }
 
-    /** Compact one-line rendering of a memvault_status payload. */
-    function describeStatus(status) {
-      if (status === null || typeof status !== 'object') return 'ok'
-      const parts = []
-      if (status.doc_count !== undefined) parts.push(`${status.doc_count} docs`)
-      if (status.block_count !== undefined) parts.push(`${status.block_count} blocks`)
-      if (status.peer_count !== undefined) parts.push(`${status.peer_count} peers`)
-      return parts.length > 0 ? parts.join(' · ') : 'ok'
-    }
-
-    /** Compact id for a table cell. */
-    function shortId(id) {
-      return typeof id === 'string' && id.length > 20 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id
-    }
-
-    /** Database glyph drawn before one bucket row's name. */
-    function DbIcon() {
-      return h('svg', { viewBox: '0 0 24 24', width: 16, height: 16, 'aria-hidden': 'true' },
-        h('ellipse', { cx: 12, cy: 6, rx: 7, ry: 3, fill: 'none', stroke: 'currentColor', strokeWidth: 1.6 }),
-        h('path', { d: 'M5 6v12c0 1.66 3.13 3 7 3s7-1.34 7-3V6', fill: 'none', stroke: 'currentColor', strokeWidth: 1.6 }),
-        h('path', { d: 'M5 12c0 1.66 3.13 3 7 3s7-1.34 7-3', fill: 'none', stroke: 'currentColor', strokeWidth: 1.6 }),
-      )
-    }
-
-    /** The moving parts of the panel: identity list, then Access / New identity tabs. */
+    /** The moving parts of the panel: identity table, then the session access table. */
     function MemvaultPanel({ sessionId }) {
       const [state, setState] = React.useState(null)
       const [error, setError] = React.useState(null)
       const [busy, setBusy] = React.useState(false)
-      const [tab, setTab] = React.useState('access')
       const [identity, setIdentity] = React.useState('')
       const [bucket, setBucket] = React.useState('')
       const [mode, setMode] = React.useState('write')
       const [bucketCache, setBucketCache] = React.useState({})
+      const [addOpen, setAddOpen] = React.useState(false)
       const [newAgent, setNewAgent] = React.useState('')
       const [newServer, setNewServer] = React.useState('')
       const [newToken, setNewToken] = React.useState('')
@@ -403,7 +385,7 @@ window.__ModuleLoader__.load({
         return () => clearInterval(timer)
       }, [refresh])
 
-      // With no binding, start on a usable identity so the Access tab pre-loads.
+      // With no binding, start on a usable identity so the access table pre-loads.
       React.useEffect(() => {
         if (identity !== '' || ids.length === 0) return
         const usable = ids.find((item) => item.status === 'connected') ?? ids[0]
@@ -438,11 +420,11 @@ window.__ModuleLoader__.load({
         }
       }, [])
 
-      // Pre-load the bucket list as soon as the Access tab shows an identity.
+      // Pre-load the bucket list as soon as an identity is selected.
       React.useEffect(() => {
-        if (tab !== 'access' || identity === '') return
+        if (identity === '') return
         void loadBuckets(identity)
-      }, [tab, identity, loadBuckets])
+      }, [identity, loadBuckets])
 
       const change = async (task) => {
         setBusy(true)
@@ -467,15 +449,6 @@ window.__ModuleLoader__.load({
         })
 
       const clearAcl = () => change(() => api('session', { sessionId, acl: null }))
-
-      const tabButton = (id, label) =>
-        h('button', {
-          type: 'button',
-          role: 'tab',
-          'aria-selected': tab === id,
-          className: `dsmv-tab${tab === id ? ' active' : ''}`,
-          onClick: () => setTab(id),
-        }, label)
 
       const rowSelected = (id) => (id === '' ? defaultSelected : !defaultSelected && bucket === id)
       const bucketRow = (row) =>
@@ -505,81 +478,9 @@ window.__ModuleLoader__.load({
           ),
         )
 
-      const accessPanel = selected === null
-        ? h('div', { className: 'dsmv-panel' },
-            h('div', { className: 'dsmv-empty' }, 'Select an identity above to manage this session’s access.'))
-        : h('div', { className: 'dsmv-panel' },
-            h('div', { className: 'dsmv-panelhead' },
-              h('div', { className: 'dsmv-paneltitle' }, 'Session access'),
-              h('div', { className: 'dsmv-note' },
-                `identity ${selected.label} · `,
-                acl === null
-                  ? 'no local ACL — every identity and bucket is available'
-                  : `bound to ${acl.identity}, ${acl.bucket === null ? 'agent default bucket' : shortId(acl.bucket)}, ${acl.mode === 'read' ? 'read-only' : 'read-write'}`,
-              ),
-            ),
-            h('div', { className: 'dsmv-tablewrap' },
-              h('table', { className: 'dsmv-table' },
-                h('thead', null, h('tr', null,
-                  h('th', null, 'Bucket'),
-                  h('th', { className: 'num' }, 'Items'),
-                  h('th', { className: 'pick' }, 'Use'),
-                )),
-                h('tbody', null,
-                  bucketRow({ id: '', name: "Agent's own bucket", sub: `${selected.agentId} · default`, items: null }),
-                  ...(buckets.loading
-                    ? [h('tr', { key: 'loading' }, h('td', { colSpan: 3, className: 'dsmv-empty' }, 'Loading buckets…'))]
-                    : buckets.error !== null && buckets.error !== undefined
-                      ? [h('tr', { key: 'error' }, h('td', { colSpan: 3, className: 'dsmv-empty dsmv-error' }, buckets.error))]
-                      : visibleBuckets.map((item) =>
-                          bucketRow({ id: item.id, name: item.name, sub: '', items: item.items }))),
-                ),
-              ),
-            ),
-            h('div', { className: 'dsmv-controls' },
-              h('div', { className: 'dsmv-row' },
-                h('div', { className: 'dsmv-label' }, 'Access'),
-                h('div', { className: 'dsmv-seg', role: 'group', 'aria-label': 'Access mode' },
-                  h('button', {
-                    type: 'button',
-                    className: `dsmv-segbtn${mode === 'read' ? ' active' : ''}`,
-                    'aria-pressed': mode === 'read',
-                    onClick: () => setMode('read'),
-                  }, 'read-only'),
-                  h('button', {
-                    type: 'button',
-                    className: `dsmv-segbtn${mode === 'write' ? ' active' : ''}`,
-                    'aria-pressed': mode === 'write',
-                    onClick: () => setMode('write'),
-                  }, 'read-write'),
-                ),
-                h('button', {
-                  type: 'button',
-                  className: 'dsmv-iconbtn',
-                  title: 'Reload buckets',
-                  'aria-label': 'Reload buckets',
-                  disabled: buckets.loading,
-                  onClick: () => loadBuckets(identity, true),
-                }, '↻'),
-              ),
-              h('div', { className: 'dsmv-actions' },
-                h('button', { type: 'button', className: 'primary', disabled: busy, onClick: applyAcl }, 'Apply to session'),
-                h('button', { type: 'button', disabled: busy || acl === null, onClick: clearAcl }, 'Clear'),
-              ),
-            ),
-            h('div', { className: 'dsmv-note' },
-              'Enforced locally: the other identities’ tools are hidden, write tools are hidden in read-only mode, ' +
-              'and calls naming another bucket are denied.'),
-          )
-
-      const identityPanel = h('div', { className: 'dsmv-panel' },
-        h('div', { className: 'dsmv-panelhead' },
-          h('div', { className: 'dsmv-paneltitle' }, 'New identity'),
-          h('div', { className: 'dsmv-note' },
-            'Redeem a single-use token from a memvault node. The agent id names the identity directory, ' +
-            'the bucket label, and the tool namespace.'),
-        ),
+      const addForm = h('div', { className: 'dsmv-addform' },
         h('div', { className: 'dsmv-form' },
+          h('div', { className: 'dsmv-paneltitle' }, 'New identity'),
           h('div', { className: 'dsmv-label' }, 'Agent id (identity directory name)'),
           h('input', {
             type: 'text',
@@ -619,13 +520,89 @@ window.__ModuleLoader__.load({
                   setNewAgent('')
                   setNewServer('')
                   setNewToken('')
+                  setAddOpen(false)
                   setIdentity(added)
                   setBucket('')
-                  setTab('access')
                 }),
             }, 'Redeem and connect'),
+            h('button', {
+              type: 'button',
+              disabled: busy,
+              onClick: () => setAddOpen(false),
+            }, 'Cancel'),
           ),
         ),
+      )
+
+      const accessPanel = h('section', { className: 'dsmv-block' },
+        h('div', { className: 'dsmv-blockhead' },
+          h('h3', null, 'Session access'),
+          h('div', { className: 'dsmv-grow' }),
+          selected === null ? null : h('span', { className: 'dsmv-note' }, `identity: ${selected.label}`),
+        ),
+        selected === null
+          ? h('div', { className: 'dsmv-tablewrap' },
+              h('div', { className: 'dsmv-empty' }, 'Select an identity above to manage this session’s access.'))
+          : h(React.Fragment, null,
+              h('div', { className: 'dsmv-note' },
+                acl === null
+                  ? 'No local ACL — every identity and bucket is available to this session.'
+                  : `Bound to ${acl.identity}, ` +
+                    `${acl.bucket === null ? 'agent default bucket' : shortId(acl.bucket)}, ` +
+                    `${acl.mode === 'read' ? 'read-only' : 'read-write'}.`),
+              h('div', { className: 'dsmv-tablewrap' },
+                h('table', { className: 'dsmv-table' },
+                  h('thead', null, h('tr', null,
+                    h('th', null, 'Bucket'),
+                    h('th', { className: 'num' }, 'Items'),
+                    h('th', { className: 'pick' }, 'Use'),
+                  )),
+                  h('tbody', null,
+                    bucketRow({ id: '', name: "Agent's own bucket", sub: `${selected.agentId} · default`, items: null }),
+                    ...(buckets.loading
+                      ? [h('tr', { key: 'loading' }, h('td', { colSpan: 3, className: 'dsmv-empty' }, 'Loading buckets…'))]
+                      : buckets.error !== null && buckets.error !== undefined
+                        ? [h('tr', { key: 'error' }, h('td', { colSpan: 3, className: 'dsmv-empty dsmv-error' }, buckets.error))]
+                        : visibleBuckets.map((item) =>
+                            bucketRow({ id: item.id, name: item.name, sub: '', items: item.items }))),
+                  ),
+                ),
+              ),
+              h('div', { className: 'dsmv-controls' },
+                h('div', { className: 'dsmv-row' },
+                  h('div', { className: 'dsmv-label' }, 'Access'),
+                  h('div', { className: 'dsmv-seg', role: 'group', 'aria-label': 'Access mode' },
+                    h('button', {
+                      type: 'button',
+                      className: `dsmv-segbtn${mode === 'read' ? ' active' : ''}`,
+                      'aria-pressed': mode === 'read',
+                      onClick: () => setMode('read'),
+                    }, 'read-only'),
+                    h('button', {
+                      type: 'button',
+                      className: `dsmv-segbtn${mode === 'write' ? ' active' : ''}`,
+                      'aria-pressed': mode === 'write',
+                      onClick: () => setMode('write'),
+                    }, 'read-write'),
+                  ),
+                  h('button', {
+                    type: 'button',
+                    className: 'dsmv-iconbtn',
+                    title: 'Reload buckets',
+                    'aria-label': 'Reload buckets',
+                    disabled: buckets.loading,
+                    onClick: () => loadBuckets(identity, true),
+                  }, '↻'),
+                ),
+                h('div', { className: 'dsmv-actions' },
+                  h('button', { type: 'button', className: 'primary', disabled: busy, onClick: applyAcl }, 'Apply to session'),
+                  h('button', { type: 'button', disabled: busy || acl === null, onClick: clearAcl }, 'Clear'),
+                ),
+              ),
+              h('div', { className: 'dsmv-note' },
+                'Enforced locally: the other identities’ tools are hidden, write tools are hidden in read-only mode, ' +
+                'and calls naming another bucket are denied.'),
+            ),
       )
 
       return h('div', { className: 'dsmv' },
@@ -640,40 +617,55 @@ window.__ModuleLoader__.load({
         ),
         error === null ? null : h('div', { className: 'dsmv-error' }, error),
 
-        h('section', { className: 'dsmv-identities' },
-          h('div', { className: 'dsmv-row' },
+        h('section', { className: 'dsmv-block' },
+          h('div', { className: 'dsmv-blockhead' },
             h('h3', null, 'Identities'),
             h('div', { className: 'dsmv-grow' }),
             selected === null ? null : h('span', { className: 'dsmv-note' }, `selected: ${selected.label}`),
+            h('button', {
+              type: 'button',
+              className: 'dsmv-mini',
+              onClick: () => setAddOpen(!addOpen),
+            }, addOpen ? 'Cancel' : '+ New identity'),
           ),
-          ids.length === 0
-            ? h('div', { className: 'dsmv-empty' }, 'No identities yet — add one below.')
-            : ids.map((item) =>
-                h(IdentityCard, {
-                  key: item.id,
-                  identity: item,
-                  selected: item.id === identity,
-                  onSelect: setIdentity,
-                  onChange: refresh,
-                  onRemoved: (id) => {
-                    if (id !== identity) return
-                    setIdentity('')
-                    setBucket('')
-                    setBucketCache((previous) => {
-                      const next = { ...previous }
-                      delete next[id]
-                      return next
-                    })
-                  },
-                  busy,
-                })),
+          h('div', { className: 'dsmv-tablewrap' },
+            h('table', { className: 'dsmv-table' },
+              h('thead', null, h('tr', null,
+                h('th', null, 'Identity'),
+                h('th', { className: 'num' }, 'Tools'),
+                h('th', { className: 'nowrap' }, 'Status'),
+                h('th', { className: 'actions' }, ''),
+              )),
+              h('tbody', null,
+                ids.length === 0
+                  ? h('tr', null, h('td', { colSpan: 4, className: 'dsmv-empty' },
+                      'No identities yet — add one with “+ New identity”.'))
+                  : ids.map((item) =>
+                      h(IdentityRow, {
+                        key: item.id,
+                        identity: item,
+                        selected: item.id === identity,
+                        onSelect: setIdentity,
+                        onChange: refresh,
+                        onRemoved: (id) => {
+                          if (id !== identity) return
+                          setIdentity('')
+                          setBucket('')
+                          setBucketCache((previous) => {
+                            const next = { ...previous }
+                            delete next[id]
+                            return next
+                          })
+                        },
+                        busy,
+                      })),
+              ),
+            ),
+          ),
+          addOpen ? addForm : null,
         ),
 
-        h('div', { className: 'dsmv-tabs', role: 'tablist' },
-          tabButton('access', 'Access control'),
-          tabButton('identity', 'New identity'),
-        ),
-        tab === 'access' ? accessPanel : identityPanel,
+        accessPanel,
       )
     }
 
