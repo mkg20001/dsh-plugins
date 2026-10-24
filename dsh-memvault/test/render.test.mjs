@@ -75,7 +75,10 @@ const state = {
 }
 const responses = {
   'state': state,
-  'buckets': { ok: true, buckets: [{ id: 'a'.repeat(64), name: 'Team', role: 'standard', items: 3 }] },
+  'buckets': { ok: true, buckets: [
+    { id: 'c'.repeat(64), name: 'agent:dsh', role: 'standard', items: 3 },
+    { id: 'a'.repeat(64), name: 'Team', role: 'standard', items: 3 },
+  ] },
   'check': { ok: true, status: { doc_count: 4, peer_count: 1 } },
 }
 const calls = []
@@ -113,22 +116,28 @@ ok(typeof view?.component === 'function', 'registers a component')
 const container = document.getElementById('root')
 const root = createRoot(container)
 root.render(React.createElement(view.component, { sessionId: 'session-1' }))
-// The panel fetches its state from an effect; settle a few event-loop turns.
-for (let turn = 0; turn < 50 && !container.innerHTML.includes('Work'); turn += 1) {
+// The panel fetches its state from an effect, then pre-loads the bucket list
+// for the bound identity; settle until the bucket table shows a row.
+for (let turn = 0; turn < 80 && !container.innerHTML.includes('Team'); turn += 1) {
   await new Promise((resolve) => setTimeout(resolve, 10))
 }
 
 const html = container.innerHTML
-ok(html.includes('Memvault session'), 'renders the panel heading')
-ok(html.includes('Session access'), 'renders the session access section')
-ok(html.includes('Add an identity'), 'renders the add-identity section')
+ok(html.includes('Memvault') && html.includes('Identities'), 'renders the panel heading and identity list')
+ok(html.includes('Access control') && html.includes('New identity'), 'renders the tab bar')
+ok(html.includes('Session access'), 'renders the access tab')
 ok(html.includes('dsh') && html.includes('Work'), 'renders both identity cards')
-ok(html.includes('mcp__sum') === false && html.includes('62 tools'), 'renders the tool count')
-ok(html.includes('bound to') === false && html.includes('read-only'), 'renders the ACL summary')
+ok(html.includes('62 tools'), 'renders the tool count')
+ok(html.includes('bound to') && html.includes('read-only'), 'renders the ACL summary')
 ok(html.includes('from the plugin row'), 'config identity is not removable')
 ok(html.includes('Remove…'), 'panel identity is removable')
-ok(html.includes('Session access') && html.includes('Load'), 'bucket controls render')
-ok(calls.includes('state'), 'panel fetched the state through /api/memvault')
+ok(html.includes('Agent\'s own bucket') && html.includes('Team'), 'pre-loads and renders the bucket table')
+ok((html.match(/type="radio"/g) ?? []).length === 2, 'the agent bucket is merged into the default row')
+ok(html.includes('agent:dsh') === false, 'the agent bucket is not listed twice')
+ok((html.match(/<svg/g) ?? []).length >= 2, 'bucket rows carry a database icon')
+ok(html.includes('read-write') && html.includes('Apply to session'), 'renders the access mode and apply control')
+ok(html.includes('Loading buckets') === false, 'bucket preload settled')
+ok(calls.includes('state') && calls.includes('buckets'), 'panel used the state and buckets endpoints')
 
 root.unmount()
 console.log(`\n${passes} passed, ${failures} failed`)

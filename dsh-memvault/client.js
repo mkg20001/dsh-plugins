@@ -21,9 +21,11 @@ window.__ModuleLoader__.load({
       .dsmv { display: flex; flex-direction: column; gap: 14px;
         padding: 18px 20px 40px; font-size: 12.5px; line-height: 1.45;
         color: var(--dsw-alias-label-primary); box-sizing: border-box;
-        width: 100%; max-width: 780px; align-self: center; }
+        width: 100%; max-width: 820px; align-self: center; }
       .dsmv h3 { margin: 0; font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
         color: var(--dsw-alias-label-secondary); font-weight: 600; }
+      .dsmv-title { font-size: 15px; font-weight: 600; }
+      .dsmv-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
       .dsmv-section { display: flex; flex-direction: column; gap: 8px;
         border: 1px solid var(--dsw-alias-border-l1); border-radius: 10px; padding: 11px;
         background: var(--dsw-alias-bg-layer-1); }
@@ -35,6 +37,7 @@ window.__ModuleLoader__.load({
         width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 7px;
         border: 1px solid var(--dsw-alias-border-l1); font: inherit;
         background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); }
+      .dsmv input[type=radio], .dsmv input[type=checkbox] { accent-color: var(--dsw-alias-brand-primary); }
       .dsmv button { font: inherit; padding: 5px 9px; border-radius: 7px; cursor: pointer;
         border: 1px solid var(--dsw-alias-border-l1); background: var(--dsw-alias-bg-layer-2);
         color: var(--dsw-alias-label-primary); white-space: nowrap; }
@@ -43,6 +46,8 @@ window.__ModuleLoader__.load({
       .dsmv button.primary { background: var(--dsw-alias-brand-primary); color: #fff;
         border-color: transparent; }
       .dsmv button.danger { color: var(--dsw-alias-state-error-primary); }
+      .dsmv button.dsmv-iconbtn { padding: 5px 8px; line-height: 1; }
+      .dsmv-identities { display: flex; flex-direction: column; gap: 8px; }
       .dsmv-identity { display: flex; flex-direction: column; gap: 6px; padding: 9px;
         border: 1px solid var(--dsw-alias-border-l1); border-radius: 9px;
         background: var(--dsw-alias-bg-base); }
@@ -59,10 +64,51 @@ window.__ModuleLoader__.load({
       .dsmv-note { color: var(--dsw-alias-label-secondary); font-size: 11px; }
       .dsmv-badge { font-size: 10px; padding: 1px 6px; border-radius: 999px;
         border: 1px solid var(--dsw-alias-border-l1); color: var(--dsw-alias-label-secondary); }
-      .dsmv-pre { margin: 0; max-height: 140px; overflow: auto; white-space: pre-wrap;
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px;
-        background: var(--dsw-alias-bg-layer-2); padding: 6px; border-radius: 6px; }
+      .dsmv-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--dsw-alias-border-l1); }
+      .dsmv button.dsmv-tab { border: none; border-radius: 0; background: transparent;
+        padding: 7px 10px; margin-bottom: -1px; color: var(--dsw-alias-label-secondary);
+        border-bottom: 2px solid transparent; }
+      .dsmv button.dsmv-tab:hover { color: var(--dsw-alias-label-primary); border-bottom-color: var(--dsw-alias-border-l2); }
+      .dsmv button.dsmv-tab.active { color: var(--dsw-alias-label-primary);
+        border-bottom-color: var(--dsw-alias-brand-primary); }
+      .dsmv-panel { display: flex; flex-direction: column; gap: 12px; }
+      .dsmv-panelhead { display: flex; flex-direction: column; gap: 2px; }
+      .dsmv-paneltitle { font-weight: 600; }
+      .dsmv-tablewrap { border: 1px solid var(--dsw-alias-border-l1); border-radius: 10px;
+        overflow: hidden; background: var(--dsw-alias-bg-base); }
+      .dsmv-table { width: 100%; border-collapse: collapse; }
+      .dsmv-table th { text-align: left; font-size: 10.5px; letter-spacing: .06em;
+        text-transform: uppercase; color: var(--dsw-alias-label-secondary); font-weight: 600;
+        padding: 7px 10px; border-bottom: 1px solid var(--dsw-alias-border-l1);
+        background: var(--dsw-alias-bg-layer-1); }
+      .dsmv-table td { padding: 8px 10px; border-bottom: 1px solid var(--dsw-alias-border-l1); }
+      .dsmv-table tr:last-child td { border-bottom: none; }
+      .dsmv-table tbody tr { cursor: pointer; }
+      .dsmv-table tbody tr:hover { background: var(--dsw-alias-bg-layer-1); }
+      .dsmv-table tbody tr.selected {
+        background: color-mix(in srgb, var(--dsw-alias-brand-primary) 12%, transparent); }
+      .dsmv-table .num { width: 1%; text-align: right; white-space: nowrap;
+        font-variant-numeric: tabular-nums; color: var(--dsw-alias-label-secondary); }
+      .dsmv-table .pick { width: 1%; text-align: right; }
+      .dsmv-cell { display: flex; align-items: center; gap: 9px; }
+      .dsmv-cell svg { flex: none; color: var(--dsw-alias-label-secondary); }
+      .dsmv-celltext { min-width: 0; }
+      .dsmv-cellname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .dsmv-cellid { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 10px; color: var(--dsw-alias-label-secondary); }
+      .dsmv-controls { display: flex; align-items: center; justify-content: space-between;
+        gap: 10px; flex-wrap: wrap; }
+      .dsmv-actions { display: flex; gap: 8px; align-items: center; }
+      .dsmv-seg { display: inline-flex; border: 1px solid var(--dsw-alias-border-l1);
+        border-radius: 8px; overflow: hidden; }
+      .dsmv button.dsmv-segbtn { border: none; border-radius: 0; background: transparent;
+        padding: 5px 10px; color: var(--dsw-alias-label-secondary); }
+      .dsmv button.dsmv-segbtn.active { background: var(--dsw-alias-bg-layer-2);
+        color: var(--dsw-alias-label-primary); }
+      .dsmv-empty { padding: 18px 12px; text-align: center; color: var(--dsw-alias-label-secondary); }
+      .dsmv-form { display: flex; flex-direction: column; gap: 8px; }
     `
+
 
     /** JSON request helper; throws the server's message on failure. */
     async function api(path, body) {
@@ -300,20 +346,46 @@ window.__ModuleLoader__.load({
       return parts.length > 0 ? parts.join(' · ') : 'ok'
     }
 
-    /** The moving parts of the panel. */
+    /** Compact id for a table cell. */
+    function shortId(id) {
+      return typeof id === 'string' && id.length > 20 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id
+    }
+
+    /** Database glyph drawn before one bucket row's name. */
+    function DbIcon() {
+      return h('svg', { viewBox: '0 0 24 24', width: 16, height: 16, 'aria-hidden': 'true' },
+        h('ellipse', { cx: 12, cy: 6, rx: 7, ry: 3, fill: 'none', stroke: 'currentColor', strokeWidth: 1.6 }),
+        h('path', { d: 'M5 6v12c0 1.66 3.13 3 7 3s7-1.34 7-3V6', fill: 'none', stroke: 'currentColor', strokeWidth: 1.6 }),
+        h('path', { d: 'M5 12c0 1.66 3.13 3 7 3s7-1.34 7-3', fill: 'none', stroke: 'currentColor', strokeWidth: 1.6 }),
+      )
+    }
+
+    /** The moving parts of the panel: identity list, then Access / New identity tabs. */
     function MemvaultPanel({ sessionId }) {
       const [state, setState] = React.useState(null)
       const [error, setError] = React.useState(null)
       const [busy, setBusy] = React.useState(false)
+      const [tab, setTab] = React.useState('access')
       const [identity, setIdentity] = React.useState('')
       const [bucket, setBucket] = React.useState('')
       const [mode, setMode] = React.useState('write')
-      const [buckets, setBuckets] = React.useState(null)
+      const [bucketCache, setBucketCache] = React.useState({})
       const [newAgent, setNewAgent] = React.useState('')
       const [newServer, setNewServer] = React.useState('')
       const [newToken, setNewToken] = React.useState('')
-      const [addOpen, setAddOpen] = React.useState(false)
+
       const acl = state?.acl ?? null
+      const ids = state?.identities ?? []
+      const selected = ids.find((item) => item.id === identity) ?? null
+      const buckets = bucketCache[identity] ?? { loading: false, items: null, error: null }
+      const defaultServer = ids[0]?.server ?? 'http://127.0.0.1:8401'
+      // The identity's agent bucket is the same thing as "no bucket argument";
+      // it is shown once, as the default row.
+      const ownBucketId = (buckets.items ?? []).find(
+        (item) => selected !== null && item.name === `agent:${selected.agentId}`,
+      )?.id
+      const defaultSelected = bucket === '' || (ownBucketId !== undefined && bucket === ownBucketId)
+      const visibleBuckets = (buckets.items ?? []).filter((item) => item.id !== ownBucketId)
 
       const refresh = React.useCallback(async () => {
         try {
@@ -331,16 +403,45 @@ window.__ModuleLoader__.load({
         return () => clearInterval(timer)
       }, [refresh])
 
+      // With no binding, start on the first identity so the Access tab is usable.
       React.useEffect(() => {
-        if (acl === null) return
+        if (identity !== '' || ids.length === 0) return
+        setIdentity(ids[0].id)
+      }, [identity, ids])
+
+      // Follow a binding when it changes (it may have been set elsewhere).
+      React.useEffect(() => {
+        if (acl === null || acl === undefined) return
         setIdentity(acl.identity)
         setBucket(acl.bucket ?? '')
         setMode(acl.mode)
       }, [acl?.identity, acl?.bucket, acl?.mode])
 
-      const ids = state?.identities ?? []
-      const selected = ids.find((item) => item.id === identity) ?? null
-      const defaultServer = ids[0]?.server ?? 'http://127.0.0.1:8401'
+      const loadBuckets = React.useCallback(async (id, force = false) => {
+        if (id === '') return
+        setBucketCache((previous) => {
+          if (!force && previous[id] !== undefined) return previous
+          return { ...previous, [id]: { loading: true, items: null, error: null } }
+        })
+        try {
+          const result = await api('buckets', { identityId: id })
+          setBucketCache((previous) => ({
+            ...previous,
+            [id]: { loading: false, items: result.buckets ?? [], error: null },
+          }))
+        } catch (failure) {
+          setBucketCache((previous) => ({
+            ...previous,
+            [id]: { loading: false, items: null, error: String(failure.message ?? failure) },
+          }))
+        }
+      }, [])
+
+      // Pre-load the bucket list as soon as the Access tab shows an identity.
+      React.useEffect(() => {
+        if (tab !== 'access' || identity === '') return
+        void loadBuckets(identity)
+      }, [tab, identity, loadBuckets])
 
       const change = async (task) => {
         setBusy(true)
@@ -355,227 +456,226 @@ window.__ModuleLoader__.load({
         }
       }
 
-      const loadBuckets = () =>
+      const applyAcl = () =>
         change(async () => {
-          if (selected === null) throw new Error('choose an identity first')
-          const result = await api('buckets', { identityId: selected.id })
-          setBuckets(result.buckets ?? [])
-        })
-
-      const apply = () =>
-        change(async () => {
-          if (identity === '') throw new Error('choose an identity first')
+          if (identity === '') throw new Error('Choose an identity first.')
           await api('session', {
             sessionId,
-            acl: { identity, bucket: bucket.trim() === '' ? null : bucket.trim(), mode },
+            acl: { identity, bucket: defaultSelected ? null : bucket, mode },
           })
         })
 
-      return h(
-        'div',
-        { className: 'dsmv' },
-        h('style', { 'data-plugin': '@local/memvault' }, PANEL_CSS),
-        h('h3', null, 'Memvault session'),
-        error === null ? null : h('div', { className: 'dsmv-error' }, error),
+      const clearAcl = () => change(() => api('session', { sessionId, acl: null }))
 
-        h(
-          'div',
-          { className: 'dsmv-section' },
-          h('h3', null, 'Session access'),
-          acl === null
-            ? h('div', { className: 'dsmv-note' }, 'No local ACL: every identity and bucket is available to this session.')
-            : h(
-                'div',
-                { className: 'dsmv-note' },
-                `Bound to ${acl.identity} · ${acl.bucket ?? 'agent default bucket'} · ${acl.mode === 'read' ? 'read-only' : 'read-write'}`,
+      const tabButton = (id, label) =>
+        h('button', {
+          type: 'button',
+          role: 'tab',
+          'aria-selected': tab === id,
+          className: `dsmv-tab${tab === id ? ' active' : ''}`,
+          onClick: () => setTab(id),
+        }, label)
+
+      const rowSelected = (id) => (id === '' ? defaultSelected : !defaultSelected && bucket === id)
+      const bucketRow = (row) =>
+        h('tr', {
+          key: row.id === '' ? 'default' : row.id,
+          className: rowSelected(row.id) ? 'selected' : '',
+          onClick: () => setBucket(row.id),
+        },
+          h('td', null,
+            h('div', { className: 'dsmv-cell' },
+              h(DbIcon, null),
+              h('div', { className: 'dsmv-celltext' },
+                h('div', { className: 'dsmv-cellname' }, row.name),
+                h('div', { className: 'dsmv-cellid' }, row.id === '' ? row.sub : shortId(row.id)),
               ),
-          h('div', { className: 'dsmv-label' }, 'Identity'),
-          h(
-            'select',
-            {
-              value: identity,
-              onChange: (event) => {
-                setIdentity(event.target.value)
-                setBuckets(null)
-                setBucket('')
-              },
-            },
-            h('option', { value: '' }, '— choose an identity —'),
-            ...ids.map((item) =>
-              h('option', { key: item.id, value: item.id }, `${item.label} (${item.agentId})`),
             ),
           ),
-          h('div', { className: 'dsmv-label' }, 'Bucket'),
-          h(
-            'div',
-            { className: 'dsmv-row' },
-            h(
-              'select',
-              {
-                className: 'dsmv-grow',
-                value: bucket,
-                onChange: (event) => setBucket(event.target.value),
-              },
-              h('option', { value: '' }, "Agent's own default bucket"),
-              ...(buckets ?? []).map((item) =>
-                h(
-                  'option',
-                  { key: item.id, value: item.id },
-                  `${item.name || item.id.slice(0, 12)} · ${item.role} · ${item.items}`,
+          h('td', { className: 'num' }, row.items === null || row.items === undefined ? '—' : String(row.items)),
+          h('td', { className: 'pick' },
+            h('input', {
+              type: 'radio',
+              name: 'dsmv-bucket',
+              checked: rowSelected(row.id),
+              'aria-label': `Use ${row.name}`,
+              onChange: () => setBucket(row.id),
+            }),
+          ),
+        )
+
+      const accessPanel = selected === null
+        ? h('div', { className: 'dsmv-panel' },
+            h('div', { className: 'dsmv-empty' }, 'Select an identity above to manage this session’s access.'))
+        : h('div', { className: 'dsmv-panel' },
+            h('div', { className: 'dsmv-panelhead' },
+              h('div', { className: 'dsmv-paneltitle' }, 'Session access'),
+              h('div', { className: 'dsmv-note' },
+                `identity ${selected.label} · `,
+                acl === null
+                  ? 'no local ACL — every identity and bucket is available'
+                  : `bound to ${acl.identity}, ${acl.bucket === null ? 'agent default bucket' : shortId(acl.bucket)}, ${acl.mode === 'read' ? 'read-only' : 'read-write'}`,
+              ),
+            ),
+            h('div', { className: 'dsmv-tablewrap' },
+              h('table', { className: 'dsmv-table' },
+                h('thead', null, h('tr', null,
+                  h('th', null, 'Bucket'),
+                  h('th', { className: 'num' }, 'Items'),
+                  h('th', { className: 'pick' }, 'Use'),
+                )),
+                h('tbody', null,
+                  bucketRow({ id: '', name: "Agent's own bucket", sub: `${selected.agentId} · default`, items: null }),
+                  ...(buckets.loading
+                    ? [h('tr', { key: 'loading' }, h('td', { colSpan: 3, className: 'dsmv-empty' }, 'Loading buckets…'))]
+                    : buckets.error !== null && buckets.error !== undefined
+                      ? [h('tr', { key: 'error' }, h('td', { colSpan: 3, className: 'dsmv-empty dsmv-error' }, buckets.error))]
+                      : visibleBuckets.map((item) =>
+                          bucketRow({ id: item.id, name: item.name, sub: '', items: item.items }))),
                 ),
               ),
-              bucket !== '' && (buckets ?? []).every((item) => item.id !== bucket)
-                ? h('option', { value: bucket }, `manual: ${bucket.slice(0, 16)}…`)
-                : null,
             ),
-            h('button', { type: 'button', disabled: busy || selected === null, onClick: loadBuckets }, 'Load'),
-          ),
+            h('div', { className: 'dsmv-controls' },
+              h('div', { className: 'dsmv-row' },
+                h('div', { className: 'dsmv-label' }, 'Access'),
+                h('div', { className: 'dsmv-seg', role: 'group', 'aria-label': 'Access mode' },
+                  h('button', {
+                    type: 'button',
+                    className: `dsmv-segbtn${mode === 'read' ? ' active' : ''}`,
+                    'aria-pressed': mode === 'read',
+                    onClick: () => setMode('read'),
+                  }, 'read-only'),
+                  h('button', {
+                    type: 'button',
+                    className: `dsmv-segbtn${mode === 'write' ? ' active' : ''}`,
+                    'aria-pressed': mode === 'write',
+                    onClick: () => setMode('write'),
+                  }, 'read-write'),
+                ),
+                h('button', {
+                  type: 'button',
+                  className: 'dsmv-iconbtn',
+                  title: 'Reload buckets',
+                  'aria-label': 'Reload buckets',
+                  disabled: buckets.loading,
+                  onClick: () => loadBuckets(identity, true),
+                }, '↻'),
+              ),
+              h('div', { className: 'dsmv-actions' },
+                h('button', { type: 'button', className: 'primary', disabled: busy, onClick: applyAcl }, 'Apply to session'),
+                h('button', { type: 'button', disabled: busy || acl === null, onClick: clearAcl }, 'Clear'),
+              ),
+            ),
+            h('div', { className: 'dsmv-note' },
+              'Enforced locally: the other identities’ tools are hidden, write tools are hidden in read-only mode, ' +
+              'and calls naming another bucket are denied.'),
+          )
+
+      const identityPanel = h('div', { className: 'dsmv-panel' },
+        h('div', { className: 'dsmv-panelhead' },
+          h('div', { className: 'dsmv-paneltitle' }, 'New identity'),
+          h('div', { className: 'dsmv-note' },
+            'Redeem a single-use token from a memvault node. The agent id names the identity directory, ' +
+            'the bucket label, and the tool namespace.'),
+        ),
+        h('div', { className: 'dsmv-form' },
+          h('div', { className: 'dsmv-label' }, 'Agent id (identity directory name)'),
           h('input', {
             type: 'text',
-            value: bucket,
-            placeholder: 'or paste a 64-hex bucket id (empty = agent default)',
-            onChange: (event) => setBucket(event.target.value.trim()),
+            value: newAgent,
+            placeholder: 'e.g. work',
+            onChange: (event) => setNewAgent(event.target.value.trim()),
           }),
-          h(
-            'div',
-            { className: 'dsmv-row' },
-            h(
-              'label',
-              { className: 'dsmv-row' },
-              h('input', {
-                type: 'radio',
-                name: 'dsmv-mode',
-                checked: mode === 'read',
-                onChange: () => setMode('read'),
-              }),
-              'read-only',
-            ),
-            h(
-              'label',
-              { className: 'dsmv-row' },
-              h('input', {
-                type: 'radio',
-                name: 'dsmv-mode',
-                checked: mode === 'write',
-                onChange: () => setMode('write'),
-              }),
-              'read-write',
-            ),
-          ),
-          h(
-            'div',
-            { className: 'dsmv-row' },
-            h('button', { type: 'button', className: 'primary', disabled: busy, onClick: apply }, 'Apply to session'),
-            h(
-              'button',
-              {
-                type: 'button',
-                disabled: busy || acl === null,
-                onClick: () => change(() => api('session', { sessionId, acl: null })),
-              },
-              'Clear ACL',
-            ),
-          ),
-          h(
-            'div',
-            { className: 'dsmv-note' },
-            'Enforced locally: other identities’ tools are hidden, write tools are hidden in read-only mode, and calls naming another bucket are denied.',
-          ),
-        ),
-
-        h('h3', null, 'Identities'),
-        ids.length === 0
-          ? h('div', { className: 'dsmv-note' }, 'No identities configured yet.')
-          : ids.map((item) =>
-              h(IdentityCard, {
-                key: item.id,
-                identity: item,
-                selected: item.id === identity,
-                onSelect: setIdentity,
-                onChange: refresh,
-                onRemoved: (id) => {
-                  if (id === identity) {
-                    setIdentity('')
-                    setBucket('')
-                    setBuckets(null)
-                  }
-                },
-                busy,
-              }),
-            ),
-
-        h(
-          'div',
-          { className: 'dsmv-section' },
-          h('h3', null, 'Add an identity'),
-          addOpen
-            ? h(
-                'div',
-                { className: 'dsmv-section' },
-                h('div', { className: 'dsmv-label' }, 'Agent id (also the identity directory name)'),
-                h('input', {
-                  type: 'text',
-                  value: newAgent,
-                  placeholder: 'e.g. work',
-                  onChange: (event) => setNewAgent(event.target.value.trim()),
+          h('div', { className: 'dsmv-label' }, 'Memvault server URL (the node that issues the token)'),
+          h('input', {
+            type: 'text',
+            value: newServer,
+            placeholder: defaultServer,
+            onChange: (event) => setNewServer(event.target.value.trim()),
+          }),
+          h('div', { className: 'dsmv-label' }, 'Provisioning token (mvjoin1:…)'),
+          h('input', {
+            type: 'password',
+            value: newToken,
+            placeholder: 'mvjoin1:…',
+            autoComplete: 'off',
+            onChange: (event) => setNewToken(event.target.value),
+          }),
+          h('div', { className: 'dsmv-actions' },
+            h('button', {
+              type: 'button',
+              className: 'primary',
+              disabled: busy || newAgent === '' || newToken.trim() === '',
+              onClick: () =>
+                change(async () => {
+                  const added = newAgent
+                  await api('redeem', {
+                    agentId: added,
+                    label: added,
+                    server: newServer.trim() === '' ? undefined : newServer.trim(),
+                    token: newToken.trim(),
+                  })
+                  setNewAgent('')
+                  setNewServer('')
+                  setNewToken('')
+                  setIdentity(added)
+                  setBucket('')
+                  setTab('access')
                 }),
-                h('div', { className: 'dsmv-label' }, 'Memvault server URL (the node that issues the token)'),
-                h('input', {
-                  type: 'text',
-                  value: newServer,
-                  placeholder: defaultServer,
-                  onChange: (event) => setNewServer(event.target.value.trim()),
-                }),
-                h('div', { className: 'dsmv-label' }, 'Provisioning token (mvjoin1:…)'),
-                h('input', {
-                  type: 'password',
-                  value: newToken,
-                  placeholder: 'mvjoin1:…',
-                  autoComplete: 'off',
-                  onChange: (event) => setNewToken(event.target.value),
-                }),
-                h(
-                  'div',
-                  { className: 'dsmv-row' },
-                  h(
-                    'button',
-                    {
-                      type: 'button',
-                      className: 'primary',
-                      disabled: busy || newAgent === '' || newToken.trim() === '',
-                      onClick: () =>
-                        change(async () => {
-                          await api('redeem', {
-                            agentId: newAgent,
-                            label: newAgent,
-                            server: newServer.trim() === '' ? undefined : newServer.trim(),
-                            token: newToken.trim(),
-                          })
-                          setNewAgent('')
-                          setNewServer('')
-                          setNewToken('')
-                          setAddOpen(false)
-                        }),
-                    },
-                    'Redeem and connect',
-                  ),
-                  h('button', { type: 'button', onClick: () => setAddOpen(false) }, 'Cancel'),
-                ),
-              )
-            : h(
-                'button',
-                {
-                  type: 'button',
-                  onClick: () => {
-                    setNewServer(defaultServer)
-                    setAddOpen(true)
-                  },
-                },
-                'New identity…',
-              ),
+            }, 'Redeem and connect'),
+          ),
         ),
       )
+
+      return h('div', { className: 'dsmv' },
+        h('style', { 'data-plugin': '@local/memvault' }, PANEL_CSS),
+        h('div', { className: 'dsmv-head' },
+          h('div', null,
+            h('div', { className: 'dsmv-title' }, 'Memvault'),
+            h('div', { className: 'dsmv-note' },
+              `session ${typeof sessionId === 'string' ? sessionId.slice(0, 8) : '—'} · ` +
+              `${ids.length} identit${ids.length === 1 ? 'y' : 'ies'}`),
+          ),
+        ),
+        error === null ? null : h('div', { className: 'dsmv-error' }, error),
+
+        h('section', { className: 'dsmv-identities' },
+          h('div', { className: 'dsmv-row' },
+            h('h3', null, 'Identities'),
+            h('div', { className: 'dsmv-grow' }),
+            selected === null ? null : h('span', { className: 'dsmv-note' }, `selected: ${selected.label}`),
+          ),
+          ids.length === 0
+            ? h('div', { className: 'dsmv-empty' }, 'No identities yet — add one below.')
+            : ids.map((item) =>
+                h(IdentityCard, {
+                  key: item.id,
+                  identity: item,
+                  selected: item.id === identity,
+                  onSelect: setIdentity,
+                  onChange: refresh,
+                  onRemoved: (id) => {
+                    if (id !== identity) return
+                    setIdentity('')
+                    setBucket('')
+                    setBucketCache((previous) => {
+                      const next = { ...previous }
+                      delete next[id]
+                      return next
+                    })
+                  },
+                  busy,
+                })),
+        ),
+
+        h('div', { className: 'dsmv-tabs', role: 'tablist' },
+          tabButton('access', 'Access control'),
+          tabButton('identity', 'New identity'),
+        ),
+        tab === 'access' ? accessPanel : identityPanel,
+      )
     }
+
 
     return {
       inject: ['slots'],

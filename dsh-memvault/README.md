@@ -36,12 +36,25 @@ Chat and Trajectory.
 ## Panel
 
 Open the **Memvault** tab in the conversation's view ring (next to Chat and
-Trajectory). The panel shows each identity with its status
-(`connected`/`pending`/`disabled`/`unconfigured`), tool count, **Check**
-(executes `memvault_status`), **Enable/Disable**, **Redeem…** (single-use
-token), an identity picker, a bucket picker (loaded through
-`memvault_bucket_list`, plus a manual 64-hex field), a read-only/read-write
-switch, **Apply to session**, and **Clear ACL**. Polling is every 3 s.
+Trajectory). The identity list comes first — each card shows status
+(`connected`/`pending`/`disabled`/`unconfigured`), agent id, namespace, tool
+count, **Check** (executes `memvault_status`), **Enable/Disable**, **Redeem…**
+(single-use token), and **Remove…** for panel-added identities. Selecting a
+card scopes everything below it.
+
+Below the list are two tabs:
+
+- **Access control** — the session binding for the selected identity. The
+  bucket list is pre-loaded (via `memvault_bucket_list`) into a table with a
+  database icon per row, the item count, and a single-choice picker; the
+  identity's own agent bucket is shown once as *Agent's own bucket* (no
+  `bucket` argument). An access segmented control switches read-only /
+  read-write, and **Apply to session** / **Clear** write the binding. A small
+  ↻ button reloads the bucket list.
+- **New identity** — agent id, memvault server URL, and provisioning token;
+  redeeming switches back to Access control with the new identity selected.
+
+State polling is every 3 s.
 
 An identity added from the panel also has **Remove…**: it disposes that
 identity's connection, clears every session binding to it, and drops its
